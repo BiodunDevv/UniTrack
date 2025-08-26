@@ -1,0 +1,222 @@
+[
+  {
+    "id": 1,
+    "student_name": "Alice Johnson",
+    "student_id": "STU001",
+    "course": "Computer Science",
+    "date": "2024-01-15",
+    "check_in_time": "08:30",
+    "check_out_time": "17:00",
+    "status": "Present",
+    "location": "Main Campus"
+  },
+  {
+    "id": 2,
+    "student_name": "Bob Wilson",
+    "student_id": "STU002",
+    "course": "Mathematics",
+    "date": "2024-01-15",
+    "check_in_time": "09:15",
+    "check_out_time": "16:45",
+    "status": "Late",
+    "location": "Science Building"
+  },
+  {
+    "id": 3,
+    "student_name": "Carol Davis",
+    "student_id": "STU003",
+    "course": "Physics",
+    "date": "2024-01-15",
+    "check_in_time": "08:45",
+    "check_out_time": null,
+    "status": "Present",
+    "location": "Physics Lab"
+  },
+  {
+    "id": 4,
+    "student_name": "David Brown",
+    "student_id": "STU004",
+    "course": "Chemistry",
+    "date": "2024-01-15",
+    "check_in_time": "08:30",
+    "check_out_time": "17:30",
+    "status": "Present",
+    "location": "Chemistry Lab"
+  },
+  {
+    "id": 5,
+    "student_name": "Emily Chen",
+    "student_id": "STU005",
+    "course": "Biology",
+    "date": "2024-01-15",
+    "check_in_time": null,
+    "check_out_time": null,
+    "status": "Absent",
+    "location": null
+  },
+  {
+    "id": 6,
+    "student_name": "Frank Garcia",
+    "student_id": "STU006",
+    "course": "English",
+    "date": "2024-01-15",
+    "check_in_time": "09:00",
+    "check_out_time": "16:30",
+    "status": "Present",
+    "location": "Arts Building"
+  },
+  {
+    "id": 7,
+    "student_name": "Grace Lee",
+    "student_id": "STU007",
+    "course": "History",
+    "date": "2024-01-15",
+    "check_in_time": "08:50",
+    "check_out_time": "17:15",
+    "status": "Present",
+    "location": "Main Campus"
+  },
+  {
+    "id": 8,
+    "student_name": "Henry Martinez",
+    "student_id": "STU008",
+    "course": "Economics",
+    "date": "2024-01-15",
+    "check_in_time": "09:30",
+    "check_out_time": "16:00",
+    "status": "Late",
+    "location": "Business Building"
+  },
+  {
+    "id": 9,
+    "student_name": "Isabella Rodriguez",
+    "student_id": "STU009",
+    "course": "Art",
+    "date": "2024-01-15",
+    "check_in_time": "08:25",
+    "check_out_time": "18:00",
+    "status": "Present",
+    "location": "Art Studio"
+  },
+  {
+    "id": 10,
+    "student_name": "Jack Thompson",
+    "student_id": "STU010",
+    "course": "Music",
+    "date": "2024-01-15",
+    "check_in_time": "08:40",
+    "check_out_time": "17:20",
+    "status": "Present",
+    "location": "Music Hall"
+  },
+  {
+    "id": 11,
+    "student_name": "Karen White",
+    "student_id": "STU011",
+    "course": "Psychology",
+    "date": "2024-01-15",
+    "check_in_time": null,
+    "check_out_time": null,
+    "status": "Absent",
+    "location": null
+  },
+  {
+    "id": 12,
+    "student_name": "Liam Anderson",
+    "student_id": "STU012",
+    "course": "Sociology",
+    "date": "2024-01-15",
+    "check_in_time": "09:10",
+    "check_out_time": "16:50",
+    "status": "Late",
+    "location": "Social Sciences"
+  },
+  {
+    "id": 13,
+    "student_name": "Maya Patel",
+    "student_id": "STU013",
+    "course": "Engineering",
+    "date": "2024-01-15",
+    "check_in_time": "08:35",
+    "check_out_time": "18:30",
+    "status": "Present",
+    "location": "Engineering Lab"
+  },
+  {
+    "id": 14,
+    "student_name": "Noah Jackson",
+    "student_id": "STU014",
+    "course": "Philosophy",
+    "date": "2024-01-15",
+    "check_in_time": "08:55",
+    "check_out_time": "17:05",
+    "status": "Present",
+    "location": "Main Campus"
+  },
+  {
+    "id": 15,
+    "student_name": "Olivia Taylor",
+    "student_id": "STU015",
+    "course": "Political Science",
+    "date": "2024-01-15",
+    "check_in_time": "09:20",
+    "check_out_time": "16:40",
+    "status": "Late",
+    "location": "Government Building"
+  },
+  {
+    "id": 16,
+    "student_name": "Peter Kim",
+    "student_id": "STU016",
+    "course": "Statistics",
+    "date": "2024-01-15",
+    "check_in_time": "08:30",
+    "check_out_time": "17:00",
+    "status": "Present",
+    "location": "Math Building"
+  },
+  {
+    "id": 17,
+    "student_name": "Quinn Roberts",
+    "student_id": "STU017",
+    "course": "Geography",
+    "date": "2024-01-15",
+    "check_in_time": "08:45",
+    "check_out_time": "16:30",
+    "status": "Present",
+    "location": "Science Building"
+  },
+  {
+    "id": 18,
+    "student_name": "Rachel Green",
+    "student_id": "STU018",
+    "course": "Environmental Science",
+    "date": "2024-01-15",
+    "check_in_time": null,
+    "check_out_time": null,
+    "status": "Absent",
+    "location": null
+  },
+  {
+    "id": 19,
+    "student_name": "Samuel Clark",
+    "student_id": "STU019",
+    "course": "Anthropology",
+    "date": "2024-01-15",
+    "check_in_time": "09:05",
+    "check_out_time": "17:10",
+    "status": "Present",
+    "location": "Social Sciences"
+  },
+  {
+    "id": 20,
+    "student_name": "Tara Wilson",
+    "student_id": "STU020",
+    "course": "Journalism",
+    "date": "2024-01-15",
+    "check_in_time": "08:50",
+    "check_out_time": "16:45",
+    "status": "Present",
+    "location": "Media Center"
+  }
+]

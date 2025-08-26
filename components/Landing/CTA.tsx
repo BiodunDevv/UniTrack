@@ -2,10 +2,10 @@ import { ArrowRightIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-import Github from "../logos/github";
 import { Button } from "../ui/button";
 import Glow from "../ui/glow";
 import { Section } from "../ui/section";
+import UniTrack from "../logos/unitrack";
 
 interface CTAProps {
   className?: string;
@@ -19,7 +19,7 @@ export default function CTA({ className }: CTAProps) {
       href: "/auth/signup",
       text: "Get Started with UniTrack",
       variant: "default" as const,
-      icon: <Github className="mr-2 size-4" />,
+      icon: <UniTrack className="mr-2 size-4" />,
       iconRight: <ArrowRightIcon className="ml-2 size-4" />,
     },
   ];
