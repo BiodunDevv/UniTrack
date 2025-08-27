@@ -2,10 +2,10 @@ import { ArrowRightIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
+import UniTrack from "../logos/unitrack";
 import { Button } from "../ui/button";
 import Glow from "../ui/glow";
 import { Section } from "../ui/section";
-import UniTrack from "../logos/unitrack";
 
 interface CTAProps {
   className?: string;

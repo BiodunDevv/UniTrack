@@ -1,11 +1,15 @@
+"use client";
+
 import {
   ArrowRightIcon,
   ClockIcon,
   MapPinIcon,
   ShieldCheckIcon,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/store/auth-store";
 
 import { Button } from "../ui/button";
 import Glow from "../ui/glow";
@@ -18,6 +22,16 @@ interface HeroProps {
 }
 
 export default function Hero({ className }: HeroProps) {
+  const { isAuthenticated, user } = useAuthStore();
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  // Use stable content until hydrated
+  const displayAuthenticated = isHydrated && isAuthenticated;
+  const displayUser = isHydrated ? user : null;
 
   const buttons = [
     {
@@ -30,6 +44,15 @@ export default function Hero({ className }: HeroProps) {
       href: "/auth/signin",
       text: "Sign In",
       variant: "default" as const,
+      iconRight: <ArrowRightIcon className="ml-2 size-4" />,
+    },
+  ];
+
+  const authenticatedButtons = [
+    {
+      href: "/dashboard",
+      text: "Navigate to Dashboard",
+      variant: "glow" as const,
       iconRight: <ArrowRightIcon className="ml-2 size-4" />,
     },
   ];
@@ -56,14 +79,16 @@ export default function Hero({ className }: HeroProps) {
         <div className="flex flex-col items-center gap-6 text-center sm:gap-12">
           {/* {badge} */}
           <h1 className="animate-appear from-foreground to-foreground dark:to-muted-foreground relative z-10 inline-block bg-linear-to-r bg-clip-text text-3xl leading-tight font-semibold text-balance text-transparent drop-shadow-2xl sm:text-6xl sm:leading-tight md:leading-tight">
-            UniTrack Attendance
+            {displayAuthenticated
+              ? `Welcome back, ${displayUser?.name?.split(" ")[0]}`
+              : "UniTrack Attendance"}
             <div className="via-primary mx-auto mt-2 h-1 w-24 animate-pulse rounded-full bg-gradient-to-r from-transparent to-transparent" />
           </h1>
 
           <p className="sm:text-md animate-appear text-muted-foreground relative z-10 max-w-[740px] text-sm font-medium text-balance opacity-0 delay-100">
-            A comprehensive system for managing classroom attendance with
-            geolocation verification, real-time monitoring, and automated
-            reporting for educational institutions.
+            {displayAuthenticated
+              ? "Ready to manage your classroom attendance? Access your dashboard to monitor sessions, track students, and generate comprehensive reports."
+              : "A comprehensive system for managing classroom attendance with geolocation verification, real-time monitoring, and automated reporting for educational institutions."}
           </p>
 
           {/* Feature highlights */}
@@ -83,19 +108,21 @@ export default function Hero({ className }: HeroProps) {
           </div>
 
           <div className="animate-appear relative z-10 flex justify-center gap-4 opacity-0 delay-300">
-            {buttons.map((button, index) => (
-              <Button
-                key={index}
-                variant={button.variant || "default"}
-                size="lg"
-                asChild
-              >
-                <a href={button.href}>
-                  {button.text}
-                  {button.iconRight}
-                </a>
-              </Button>
-            ))}
+            {(displayAuthenticated ? authenticatedButtons : buttons).map(
+              (button, index) => (
+                <Button
+                  key={index}
+                  variant={button.variant || "default"}
+                  size="lg"
+                  asChild
+                >
+                  <a href={button.href}>
+                    {button.text}
+                    {button.iconRight}
+                  </a>
+                </Button>
+              ),
+            )}
           </div>
 
           <div className="relative w-full pt-12">

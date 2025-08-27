@@ -1,0 +1,729 @@
+"use client";
+
+import {
+  Activity,
+  ArrowLeft,
+  Calendar,
+  CheckCircle,
+  Clock,
+  Download,
+  Hash,
+  MapPin,
+  MapPinIcon,
+  User,
+  Users,
+  XCircle,
+} from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import * as React from "react";
+
+import { DashboardLayout } from "@/components/layouts/dashboard-layout";
+import { Badge } from "@/components/ui/badge";
+import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  "https://unitrack-backend-hd9s.onrender.com/api";
+
+// Function to get auth token from localStorage
+const getAuthToken = (): string | null => {
+  try {
+    const authStorage = localStorage.getItem("auth-storage");
+    if (authStorage) {
+      const parsed = JSON.parse(authStorage);
+      return parsed.state?.token || null;
+    }
+  } catch (error) {
+    console.error("Error getting auth token:", error);
+  }
+  return null;
+};
+
+interface SessionDetailResponse {
+  session: {
+    _id: string;
+    course_id: {
+      _id: string;
+      course_code: string;
+      title: string;
+    };
+    teacher_id: {
+      _id: string;
+      name: string;
+      email: string;
+    };
+    session_code: string;
+    start_ts: string;
+    expiry_ts: string;
+    lat: number;
+    lng: number;
+    radius_m: number;
+    nonce: string;
+    is_active: boolean;
+    is_expired: boolean;
+    created_at: string;
+    createdAt: string;
+    updatedAt: string;
+    __v: number;
+  };
+  attendance: Array<{
+    _id: string;
+    session_id: string;
+    course_id: string;
+    student_id: {
+      _id: string;
+      matric_no: string;
+      name: string;
+      email: string;
+    };
+    matric_no_submitted: string;
+    device_fingerprint: string;
+    lat: number;
+    lng: number;
+    accuracy: number;
+    status: "present" | "absent" | "rejected";
+    reason: string;
+    receipt_signature: string;
+    submitted_at: string;
+    createdAt: string;
+    updatedAt: string;
+    __v: number;
+  }>;
+  statistics: {
+    total_submissions: number;
+    present_count: number;
+    absent_count: number;
+    rejected_count: number;
+    attendance_rate: number;
+  };
+}
+
+export default function SessionDetailPage() {
+  const params = useParams();
+  const router = useRouter();
+  const sessionId = params.sessionId as string;
+
+  const [sessionData, setSessionData] =
+    React.useState<SessionDetailResponse | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  // Fetch session details
+  React.useEffect(() => {
+    const fetchSessionDetails = async () => {
+      try {
+        setIsLoading(true);
+        const token = getAuthToken();
+
+        if (!token) {
+          throw new Error("Authentication token not found");
+        }
+
+        const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(
+            errorData.message || `HTTP error! status: ${response.status}`,
+          );
+        }
+
+        const data = await response.json();
+        console.log("Session details data:", data);
+        setSessionData(data);
+      } catch (err) {
+        console.error("Session details fetch error:", err);
+        setError(err instanceof Error ? err.message : "An error occurred");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSessionDetails();
+  }, [sessionId]);
+
+  const calculateDistance = (
+    lat1: number,
+    lng1: number,
+    lat2: number,
+    lng2: number,
+  ) => {
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = (lat1 * Math.PI) / 180;
+    const φ2 = (lat2 * Math.PI) / 180;
+    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+    const Δλ = ((lng2 - lng1) * Math.PI) / 180;
+
+    const a =
+      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // Distance in meters
+  };
+
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString();
+  };
+
+  const getStatusBadge = (isActive: boolean, isExpired: boolean) => {
+    if (isExpired) {
+      return <Badge variant="secondary">Expired</Badge>;
+    }
+    if (isActive) {
+      return <Badge className="bg-green-500">Active</Badge>;
+    }
+    return <Badge variant="outline">Ended</Badge>;
+  };
+
+  const downloadAttendanceReport = async () => {
+    try {
+      const token = getAuthToken();
+
+      if (!token) {
+        throw new Error("Authentication token not found");
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/sessions/${sessionId}/report`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `session-${sessionData?.session.session_code}-attendance.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error("Failed to download report:", error);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="border-primary h-8 w-8 animate-spin rounded-full border-b-2"></div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error || !sessionData) {
+    return (
+      <DashboardLayout>
+        <div className="flex flex-1 items-center justify-center">
+          <div className="text-center">
+            <p className="mb-4 text-red-500">{error || "Session not found"}</p>
+            <div className="flex justify-center gap-2">
+              <Button onClick={() => window.location.reload()}>
+                Try Again
+              </Button>
+              <Button variant="outline" onClick={() => router.back()}>
+                Go Back
+              </Button>
+            </div>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const { session, attendance, statistics } = sessionData;
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-6 p-4 lg:p-6">
+        {/* Breadcrumb */}
+        <div className="animate-appear opacity-0">
+          <Breadcrumb
+            items={[
+              { label: "Courses", href: "/course" },
+              {
+                label: session.course_id.title,
+                href: `/course/${session.course_id._id}`,
+              },
+              { label: `Session ${session.session_code}`, current: true },
+            ]}
+          />
+        </div>
+
+        {/* Header */}
+        <div className="animate-appear flex flex-col gap-4 opacity-0 delay-100 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="default" size="sm" onClick={() => router.back()}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold">Session Details</h1>
+              <p className="text-muted-foreground">
+                {session.course_id.course_code} - {session.course_id.title}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            {session.is_active && !session.is_expired && (
+              <Button
+                onClick={() => router.push(`/session/${sessionId}/live`)}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <Activity className="mr-2 h-4 w-4" />
+                View Live
+              </Button>
+            )}
+            <Button variant="default" onClick={downloadAttendanceReport}>
+              <Download className="mr-2 h-4 w-4" />
+              Download Report
+            </Button>
+          </div>
+        </div>
+
+        {/* Main Content Grid */}
+        <div className="grid gap-6 lg:grid-cols-4">
+          {/* Session Info - Takes 3 columns on desktop */}
+          <div className="lg:col-span-3">
+            <Card className="animate-appear border-border/50 bg-card/50 hover:border-border hover:bg-card/80 backdrop-blur-sm transition-all duration-300">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Hash className="h-5 w-5" />
+                  Session Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div>
+                    <label className="text-sm font-medium">Session Code</label>
+                    <p className="text-primary mt-1 font-mono text-xl font-bold sm:text-2xl">
+                      {session.session_code}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Status</label>
+                    <div className="mt-1">
+                      {getStatusBadge(session.is_active, session.is_expired)}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Teacher</label>
+                    <p className="text-muted-foreground mt-1 flex items-center gap-2 text-sm">
+                      <User className="h-4 w-4 flex-shrink-0" />
+                      <span className="truncate">
+                        {session.teacher_id.name}
+                      </span>
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Start Time</label>
+                    <p className="text-muted-foreground mt-1 flex items-center gap-2 text-sm">
+                      <Calendar className="h-4 w-4 flex-shrink-0" />
+                      <span className="truncate">
+                        {formatDateTime(session.start_ts)}
+                      </span>
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">End Time</label>
+                    <p className="text-muted-foreground mt-1 flex items-center gap-2 text-sm">
+                      <Clock className="h-4 w-4 flex-shrink-0" />
+                      <span className="truncate">
+                        {formatDateTime(session.expiry_ts)}
+                      </span>
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Location</label>
+                    <p className="text-muted-foreground mt-1 flex items-center gap-2 text-sm">
+                      <MapPin className="h-4 w-4 flex-shrink-0" />
+                      <span className="truncate">
+                        {session.lat.toFixed(6)}, {session.lng.toFixed(6)}
+                      </span>
+                    </p>
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      Radius: {session.radius_m}m
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Statistics Sidebar - Takes 1 column on desktop */}
+          <div className="lg:col-span-1">
+            <Card className="animate-appear border-border/50 bg-card/50 hover:border-border hover:bg-card/80 backdrop-blur-sm transition-all duration-300">
+              <CardHeader>
+                <CardTitle className="text-lg">Quick Stats</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-2 lg:gap-0 lg:space-y-4">
+                  <div className="text-center lg:text-left">
+                    <div className="text-primary text-xl font-bold sm:text-2xl">
+                      {statistics.total_submissions}
+                    </div>
+                    <div className="text-muted-foreground text-xs sm:text-sm">
+                      Total
+                    </div>
+                  </div>
+                  <div className="text-center lg:text-left">
+                    <div className="text-xl font-bold text-green-600 sm:text-2xl">
+                      {statistics.present_count}
+                    </div>
+                    <div className="text-muted-foreground text-xs sm:text-sm">
+                      Present
+                    </div>
+                  </div>
+                  <div className="text-center lg:text-left">
+                    <div className="text-xl font-bold text-orange-600 sm:text-2xl">
+                      {statistics.rejected_count}
+                    </div>
+                    <div className="text-muted-foreground text-xs sm:text-sm">
+                      Rejected
+                    </div>
+                  </div>
+                  <div className="text-center lg:pt-4 lg:text-left">
+                    <div className="text-primary text-xl font-bold sm:text-2xl">
+                      {statistics.attendance_rate}%
+                    </div>
+                    <div className="text-muted-foreground text-xs sm:text-sm">
+                      Rate
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Full Width Attendance Table */}
+        <div className="animate-appear opacity-0 delay-300">
+          <Card className="border-border/50 bg-card/50 hover:border-border hover:bg-card/80 backdrop-blur-sm transition-all duration-300">
+            <CardHeader>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5 flex-shrink-0" />
+                  <span className="truncate">
+                    Attendance Records ({attendance.length})
+                  </span>
+                </CardTitle>
+                {attendance.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    <Badge
+                      variant="outline"
+                      className="text-xs text-green-600 sm:text-sm"
+                    >
+                      Present: {statistics.present_count}
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className="text-xs text-orange-600 sm:text-sm"
+                    >
+                      Rejected: {statistics.rejected_count}
+                    </Badge>
+                  </div>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="p-0 sm:p-6">
+              {attendance.length === 0 ? (
+                <div className="px-6 py-8 text-center">
+                  <Users className="text-muted-foreground/50 mx-auto mb-4 h-12 w-12" />
+                  <p className="text-muted-foreground">
+                    No attendance records yet
+                  </p>
+                  {session.is_active && (
+                    <p className="text-muted-foreground mt-2 text-sm">
+                      Students can mark attendance using session code:{" "}
+                      <span className="font-mono font-semibold">
+                        {session.session_code}
+                      </span>
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {/* Mobile Horizontal Scrollable Table */}
+                  <div className="block sm:hidden">
+                    <div className="overflow-x-auto">
+                      <div className="min-w-[800px] px-4">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-border border-b">
+                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
+                                #
+                              </th>
+                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
+                                Student
+                              </th>
+                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
+                                Status
+                              </th>
+                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
+                                Distance
+                              </th>
+                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
+                                Accuracy
+                              </th>
+                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
+                                Time
+                              </th>
+                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
+                                Location
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {attendance
+                              .sort(
+                                (a, b) =>
+                                  new Date(a.submitted_at).getTime() -
+                                  new Date(b.submitted_at).getTime(),
+                              )
+                              .map((record, index) => {
+                                const distance = calculateDistance(
+                                  record.lat,
+                                  record.lng,
+                                  session.lat,
+                                  session.lng,
+                                );
+                                const isWithinRadius =
+                                  distance <= session.radius_m;
+
+                                return (
+                                  <tr
+                                    key={record._id}
+                                    className="border-border/50 hover:bg-muted/50 border-b transition-colors"
+                                  >
+                                    <td className="px-2 py-3 whitespace-nowrap">
+                                      <div className="flex items-center gap-1">
+                                        {record.status === "present" ? (
+                                          <CheckCircle className="h-3 w-3 flex-shrink-0 text-green-500" />
+                                        ) : (
+                                          <XCircle className="h-3 w-3 flex-shrink-0 text-red-500" />
+                                        )}
+                                        <span className="text-xs font-medium">
+                                          #{index + 1}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className="px-2 py-3">
+                                      <div className="min-w-[120px]">
+                                        <p className="truncate text-xs font-medium">
+                                          {record.student_id.name}
+                                        </p>
+                                        <p className="text-muted-foreground truncate text-xs">
+                                          {record.student_id.matric_no}
+                                        </p>
+                                      </div>
+                                    </td>
+                                    <td className="px-2 py-3 whitespace-nowrap">
+                                      <Badge
+                                        variant={
+                                          record.status === "present"
+                                            ? "default"
+                                            : record.status === "rejected"
+                                              ? "destructive"
+                                              : "secondary"
+                                        }
+                                        className="text-xs"
+                                      >
+                                        {record.status.toUpperCase()}
+                                      </Badge>
+                                    </td>
+                                    <td className="px-2 py-3 whitespace-nowrap">
+                                      <span
+                                        className={`rounded px-2 py-1 text-xs ${
+                                          isWithinRadius
+                                            ? "bg-green-100 text-green-700"
+                                            : "bg-red-100 text-red-700"
+                                        }`}
+                                      >
+                                        {Math.round(distance)}m
+                                      </span>
+                                    </td>
+                                    <td className="px-2 py-3 whitespace-nowrap">
+                                      <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-700">
+                                        ±{record.accuracy}m
+                                      </span>
+                                    </td>
+                                    <td className="px-2 py-3 whitespace-nowrap">
+                                      <p className="min-w-[100px] text-xs">
+                                        {formatDateTime(record.submitted_at)}
+                                      </p>
+                                    </td>
+                                    <td className="px-2 py-3 whitespace-nowrap">
+                                      <div className="flex min-w-[100px] items-center gap-1">
+                                        <MapPinIcon className="text-muted-foreground h-3 w-3 flex-shrink-0" />
+                                        <p className="text-muted-foreground truncate text-xs">
+                                          {record.lat.toFixed(4)},{" "}
+                                          {record.lng.toFixed(4)}
+                                        </p>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Desktop Table */}
+                  <div className="hidden sm:block">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-border border-b">
+                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
+                              #
+                            </th>
+                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
+                              Student
+                            </th>
+                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
+                              Status
+                            </th>
+                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
+                              Distance
+                            </th>
+                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
+                              Accuracy
+                            </th>
+                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
+                              Time
+                            </th>
+                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
+                              Location
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {attendance
+                            .sort(
+                              (a, b) =>
+                                new Date(a.submitted_at).getTime() -
+                                new Date(b.submitted_at).getTime(),
+                            )
+                            .map((record, index) => {
+                              const distance = calculateDistance(
+                                record.lat,
+                                record.lng,
+                                session.lat,
+                                session.lng,
+                              );
+                              const isWithinRadius =
+                                distance <= session.radius_m;
+
+                              return (
+                                <tr
+                                  key={record._id}
+                                  className="border-border/50 hover:bg-muted/50 border-b transition-colors"
+                                >
+                                  <td className="px-4 py-4">
+                                    <div className="flex items-center gap-2">
+                                      {record.status === "present" ? (
+                                        <CheckCircle className="h-4 w-4 text-green-500" />
+                                      ) : (
+                                        <XCircle className="h-4 w-4 text-red-500" />
+                                      )}
+                                      <span className="text-sm font-medium">
+                                        #{index + 1}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-4">
+                                    <div>
+                                      <p className="text-sm font-medium">
+                                        {record.student_id.name}
+                                      </p>
+                                      <p className="text-muted-foreground text-xs">
+                                        {record.student_id.matric_no}
+                                      </p>
+                                      <p className="text-muted-foreground text-xs">
+                                        {record.student_id.email}
+                                      </p>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-4">
+                                    <div className="space-y-1">
+                                      <Badge
+                                        variant={
+                                          record.status === "present"
+                                            ? "default"
+                                            : record.status === "rejected"
+                                              ? "destructive"
+                                              : "secondary"
+                                        }
+                                        className="text-xs"
+                                      >
+                                        {record.status.toUpperCase()}
+                                      </Badge>
+                                      {record.reason && (
+                                        <p className="text-muted-foreground text-xs italic">
+                                          {record.reason}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-4">
+                                    <span
+                                      className={`rounded px-2 py-1 text-xs ${
+                                        isWithinRadius
+                                          ? "bg-green-100 text-green-700"
+                                          : "bg-red-100 text-red-700"
+                                      }`}
+                                    >
+                                      {Math.round(distance)}m
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-4">
+                                    <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-700">
+                                      ±{record.accuracy}m
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-4">
+                                    <p className="text-sm">
+                                      {formatDateTime(record.submitted_at)}
+                                    </p>
+                                  </td>
+                                  <td className="px-4 py-4">
+                                    <div className="flex items-center gap-1">
+                                      <MapPinIcon className="text-muted-foreground h-3 w-3" />
+                                      <p className="text-muted-foreground text-xs">
+                                        {record.lat.toFixed(4)},{" "}
+                                        {record.lng.toFixed(4)}
+                                      </p>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </DashboardLayout>
+  );
+}

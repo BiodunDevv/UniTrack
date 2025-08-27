@@ -49,6 +49,7 @@ export default function Screenshot({
       width={width}
       height={height}
       className={className}
+      priority
     />
   );
 }

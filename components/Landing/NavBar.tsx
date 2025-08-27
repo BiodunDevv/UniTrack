@@ -4,6 +4,7 @@ import { Menu } from "lucide-react";
 import { ReactNode, useEffect, useState } from "react";
 
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/store/auth-store";
 
 import UniTrack from "../logos/unitrack";
 import { Button, type ButtonProps } from "../ui/button";
@@ -31,6 +32,7 @@ interface NavBarProps {
 export default function NavBar({ className }: NavBarProps) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { isAuthenticated } = useAuthStore();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -54,7 +56,11 @@ export default function NavBar({ className }: NavBarProps) {
   ];
 
   const actions: NavbarActionProps[] = [
-    { text: "Get Started", href: "/auth/signup", isButton: true },
+    {
+      text: isAuthenticated ? "Dashboard" : "Get Started",
+      href: isAuthenticated ? "/dashboard" : "/auth/signup",
+      isButton: true,
+    },
   ];
 
   return (
@@ -145,7 +151,7 @@ export default function NavBar({ className }: NavBarProps) {
               </SheetTrigger>
               <SheetContent
                 side="right"
-                className="border-border/50 bg-background/95 backdrop-blur-xl"
+                className="border-border/50 bg-background/95 w-[85vw] max-w-sm backdrop-blur-xl"
               >
                 <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
                 <nav className="flex h-full flex-col">
@@ -162,13 +168,13 @@ export default function NavBar({ className }: NavBarProps) {
                   </div>
 
                   {/* Navigation Links */}
-                  <div className="flex-1 space-y-2">
+                  <div className="flex-1 space-y-1">
                     {mobileLinks.map((link, index) => (
                       <a
                         key={index}
                         href={link.href}
                         onClick={handleLinkClick}
-                        className="group text-muted-foreground hover:bg-primary/10 hover:text-foreground relative flex items-center rounded-lg px-4 py-3 text-lg font-medium transition-all duration-300 hover:translate-x-1"
+                        className="group text-muted-foreground hover:bg-primary/10 hover:text-foreground relative flex items-center rounded-lg px-4 py-4 text-base font-medium transition-all duration-300 hover:translate-x-1 active:scale-95"
                       >
                         <span className="relative z-10">{link.text}</span>
                         <div className="from-primary/5 absolute inset-0 rounded-lg bg-gradient-to-r to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
@@ -187,10 +193,12 @@ export default function NavBar({ className }: NavBarProps) {
                     <Button
                       variant="default"
                       asChild
-                      className="from-primary to-primary/80 w-full bg-gradient-to-r shadow-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
+                      className="from-primary to-primary/80 w-full bg-gradient-to-r py-3 text-base shadow-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-xl active:scale-95"
                       onClick={handleLinkClick}
                     >
-                      <a href="/auth/signup">Get Started</a>
+                      <a href={isAuthenticated ? "/dashboard" : "/auth/signup"}>
+                        {isAuthenticated ? "Dashboard" : "Get Started"}
+                      </a>
                     </Button>
                   </div>
                 </nav>

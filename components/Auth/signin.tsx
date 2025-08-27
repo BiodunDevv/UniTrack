@@ -4,11 +4,14 @@ import {
   ArrowRight,
   EyeIcon,
   EyeOffIcon,
+  LoaderIcon,
   LockIcon,
   MailIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import UniTrack from "@/components/logos/unitrack";
 import { Badge } from "@/components/ui/badge";
@@ -17,14 +20,60 @@ import { Card } from "@/components/ui/card";
 import Glow from "@/components/ui/glow";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuthStore } from "@/store/auth-store";
 
 export default function SignInForm() {
+  const router = useRouter();
+  const {
+    login,
+    isLoading,
+    error,
+    isAuthenticated,
+    verificationToken,
+    clearError,
+  } = useAuthStore();
+
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
     rememberMe: false,
   });
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      toast.success("Welcome back!");
+      router.push("/dashboard");
+    }
+  }, [isAuthenticated, router]);
+
+  useEffect(() => {
+    if (verificationToken) {
+      toast.info("Please verify your email to continue");
+      router.push(
+        `/auth/verify-code?email=${encodeURIComponent(formData.email)}`,
+      );
+    }
+  }, [verificationToken, router, formData.email]);
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      clearError();
+    }
+  }, [error, clearError]);
+
+  // If user is already authenticated, redirect immediately
+  if (isAuthenticated) {
+    return (
+      <div className="bg-background flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="border-primary mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-b-2"></div>
+          <p className="text-muted-foreground">Redirecting to dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -34,10 +83,20 @@ export default function SignInForm() {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle signin logic here
-    console.log("Signin form submitted:", formData);
+
+    if (!formData.email || !formData.password) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+
+    try {
+      await login(formData.email, formData.password);
+      router.push("/dashboard");
+    } catch {
+      // Error is handled by the store and useEffect
+    }
   };
 
   return (
@@ -145,9 +204,23 @@ export default function SignInForm() {
               </div>
 
               {/* Submit Button */}
-              <Button type="submit" className="w-full" size="lg">
-                Sign In
-                <ArrowRight className="ml-2 size-4" />
+              <Button
+                type="submit"
+                className="w-full"
+                size="lg"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <LoaderIcon className="mr-2 size-4 animate-spin" />
+                    Signing In...
+                  </>
+                ) : (
+                  <>
+                    Sign In
+                    <ArrowRight className="ml-2 size-4" />
+                  </>
+                )}
               </Button>
             </form>
 

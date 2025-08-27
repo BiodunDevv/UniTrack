@@ -4,12 +4,15 @@ import {
   ArrowRight,
   EyeIcon,
   EyeOffIcon,
+  LoaderIcon,
   LockIcon,
   MailIcon,
   UserIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import UniTrack from "@/components/logos/unitrack";
 import { Badge } from "@/components/ui/badge";
@@ -18,8 +21,19 @@ import { Card } from "@/components/ui/card";
 import Glow from "@/components/ui/glow";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuthStore } from "@/store/auth-store";
 
 export default function SignUpForm() {
+  const router = useRouter();
+  const {
+    registerTeacher,
+    isLoading,
+    error,
+    registrationToken,
+    clearError,
+    isAuthenticated,
+  } = useAuthStore();
+
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     firstName: "",
@@ -28,15 +42,75 @@ export default function SignUpForm() {
     password: "",
   });
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push("/dashboard");
+    }
+  }, [isAuthenticated, router]);
+
+  useEffect(() => {
+    if (registrationToken) {
+      toast.success("Registration successful! Please verify your account.");
+      router.push(
+        `/auth/verify-code?email=${encodeURIComponent(formData.email)}&type=registration`,
+      );
+    }
+  }, [registrationToken, router, formData.email]);
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      clearError();
+    }
+  }, [error, clearError]);
+
+  // If user is already authenticated, redirect immediately
+  if (isAuthenticated) {
+    return (
+      <div className="bg-background flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="border-primary mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-b-2"></div>
+          <p className="text-muted-foreground">
+            You are already signed in. Redirecting...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle signup logic here
-    console.log("Signup form submitted:", formData);
+
+    if (
+      !formData.firstName ||
+      !formData.lastName ||
+      !formData.email ||
+      !formData.password
+    ) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      toast.error("Password must be at least 6 characters long");
+      return;
+    }
+
+    try {
+      await registerTeacher({
+        name: `${formData.firstName} ${formData.lastName}`,
+        email: formData.email,
+        password: formData.password,
+        role: "teacher",
+      });
+    } catch {
+      // Error is handled by the store and useEffect
+    }
   };
 
   return (
@@ -158,9 +232,23 @@ export default function SignUpForm() {
               </div>
 
               {/* Submit Button */}
-              <Button type="submit" className="w-full" size="lg">
-                Create Account
-                <ArrowRight className="ml-2 size-4" />
+              <Button
+                type="submit"
+                className="w-full"
+                size="lg"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <LoaderIcon className="mr-2 size-4 animate-spin" />
+                    Creating Account...
+                  </>
+                ) : (
+                  <>
+                    Create Account
+                    <ArrowRight className="ml-2 size-4" />
+                  </>
+                )}
               </Button>
             </form>
 

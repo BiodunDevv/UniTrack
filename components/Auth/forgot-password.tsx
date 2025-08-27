@@ -1,8 +1,10 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, MailIcon } from "lucide-react";
+import { ArrowRight, LoaderIcon, MailIcon } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import UniTrack from "@/components/logos/unitrack";
 import { Badge } from "@/components/ui/badge";
@@ -11,16 +13,57 @@ import { Card } from "@/components/ui/card";
 import Glow from "@/components/ui/glow";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuthStore } from "@/store/auth-store";
 
 export default function ForgotPasswordForm() {
+  const router = useRouter();
+  const { requestPasswordResetOTP, isLoading, error, clearError } =
+    useAuthStore();
+
   const [email, setEmail] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      clearError();
+    }
+  }, [error, clearError]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle forgot password logic here
-    console.log("Forgot password form submitted:", email);
-    setIsSubmitted(true);
+
+    if (!email) {
+      toast.error("Please enter your email address");
+      return;
+    }
+
+    try {
+      await requestPasswordResetOTP(email);
+      setIsSubmitted(true);
+      toast.success("OTP sent successfully!");
+      // Auto-navigate to reset password page after 2 seconds
+      setTimeout(() => {
+        router.push(`/auth/reset-password?email=${encodeURIComponent(email)}`);
+      }, 2000);
+    } catch (error: unknown) {
+      // Check if the error message is actually a success message
+      const errorMessage = (error as { message?: string })?.message || "";
+      if (
+        errorMessage.toLowerCase().includes("otp has been sent") ||
+        errorMessage.toLowerCase().includes("if the email exists")
+      ) {
+        // This is actually a success response
+        setIsSubmitted(true);
+        toast.success("OTP sent successfully!");
+        setTimeout(() => {
+          router.push(
+            `/auth/reset-password?email=${encodeURIComponent(email)}`,
+          );
+        }, 2000);
+      }
+      // Otherwise let the useEffect handle the error display
+    }
   };
 
   if (isSubmitted) {
@@ -55,17 +98,20 @@ export default function ForgotPasswordForm() {
               </h1>
 
               <p className="text-muted-foreground mb-6 text-sm leading-relaxed">
-                We&apos;ve sent a password reset link to{" "}
+                If the email exists, a 6-digit reset code has been sent to{" "}
                 <span className="text-foreground font-medium">{email}</span>.
-                Click the link in the email to reset your password.
+                You will be redirected to enter the code shortly.
               </p>
 
               <Card className="animate-in slide-in-from-bottom border-border/50 bg-background/80 p-6 backdrop-blur-sm delay-200 duration-600">
                 <div className="space-y-4">
                   <p className="text-muted-foreground text-sm">
-                    Didn&apos;t receive the email? Check your spam folder or try
-                    again.
+                    Redirecting you to enter the reset code...
                   </p>
+
+                  <div className="flex items-center justify-center py-4">
+                    <LoaderIcon className="text-primary h-6 w-6 animate-spin" />
+                  </div>
 
                   <Button
                     onClick={() => setIsSubmitted(false)}
@@ -76,9 +122,11 @@ export default function ForgotPasswordForm() {
                   </Button>
 
                   <Button asChild className="w-full">
-                    <Link href="/auth/signin">
-                      <ArrowLeft className="mr-2 size-4" />
-                      Back to Sign In
+                    <Link
+                      href={`/auth/reset-password?email=${encodeURIComponent(email)}`}
+                    >
+                      Continue to Reset Password
+                      <ArrowRight className="ml-2 size-4" />
                     </Link>
                   </Button>
                 </div>
@@ -142,9 +190,23 @@ export default function ForgotPasswordForm() {
               </div>
 
               {/* Submit Button */}
-              <Button type="submit" className="w-full" size="lg">
-                Send Reset Link
-                <ArrowRight className="ml-2 size-4" />
+              <Button
+                type="submit"
+                className="w-full"
+                size="lg"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <LoaderIcon className="mr-2 size-4 animate-spin" />
+                    Sending Code...
+                  </>
+                ) : (
+                  <>
+                    Send Reset Code
+                    <ArrowRight className="ml-2 size-4" />
+                  </>
+                )}
               </Button>
             </form>
 

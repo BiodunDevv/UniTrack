@@ -1,6 +1,7 @@
 import "@/app/globals.css";
 
 import type { Metadata } from "next";
+import { Toaster } from "sonner";
 
 import { ThemeProvider } from "@/components/contexts/theme-provider";
 import { inter } from "@/lib/fonts";
@@ -84,7 +85,15 @@ export default function RootLayout({
         />
       </head>
       <body className={`${inter.className} bg-background antialiased`}>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          {children}
+          <Toaster
+            theme="dark"
+            position="bottom-right"
+            closeButton
+            richColors
+          />
+        </ThemeProvider>
       </body>
     </html>
   );

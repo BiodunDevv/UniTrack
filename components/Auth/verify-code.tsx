@@ -1,8 +1,10 @@
 "use client";
 
-import { ArrowRight, MailIcon, RefreshCwIcon } from "lucide-react";
+import { ArrowRight, LoaderIcon, RefreshCwIcon } from "lucide-react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 import UniTrack from "@/components/logos/unitrack";
 import { Badge } from "@/components/ui/badge";
@@ -10,14 +12,45 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import Glow from "@/components/ui/glow";
 import { Input } from "@/components/ui/input";
+import { useAuthStore } from "@/store/auth-store";
 
 export default function VerifyCodeForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const email = searchParams.get("email") || "";
+  const type = searchParams.get("type") || "login"; // 'registration' or 'login'
+
+  const {
+    verifyRegistration,
+    verifyEmail,
+    requestVerificationCode,
+    isLoading,
+    error,
+    isAuthenticated,
+    registrationToken,
+    verificationToken,
+    clearError,
+  } = useAuthStore();
+
   const [code, setCode] = useState(["", "", "", "", "", ""]);
-  const [isVerified, setIsVerified] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [timeLeft, setTimeLeft] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      toast.success("Email verified successfully!");
+      router.push("/dashboard");
+    }
+  }, [isAuthenticated, router]);
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      clearError();
+    }
+  }, [error, clearError]);
 
   // Timer for resend button
   useEffect(() => {
@@ -61,85 +94,50 @@ export default function VerifyCodeForm() {
     inputRefs.current[targetIndex]?.focus();
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const verificationCode = code.join("");
-    if (verificationCode.length === 6) {
-      // Handle verification logic here
-      console.log("Verification code submitted:", verificationCode);
-      setIsVerified(true);
+
+    if (verificationCode.length !== 6) {
+      toast.error("Please enter the complete 6-digit code");
+      return;
+    }
+
+    try {
+      if (type === "registration" && registrationToken) {
+        await verifyRegistration(registrationToken, verificationCode);
+        toast.success("Registration verified! Please sign in.");
+        router.push("/auth/signin");
+      } else if (verificationToken) {
+        await verifyEmail(verificationToken, verificationCode);
+      } else {
+        toast.error("Verification token not found. Please try again.");
+      }
+    } catch {
+      // Error is handled by the store and useEffect
     }
   };
 
   const handleResend = async () => {
+    if (!email) {
+      toast.error("Email not found. Please go back and try again.");
+      return;
+    }
+
     setIsResending(true);
-    // Handle resend logic here
-    await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate API call
-    setIsResending(false);
-    setTimeLeft(60);
-    setCanResend(false);
-    setCode(["", "", "", "", "", ""]);
-    inputRefs.current[0]?.focus();
+    try {
+      await requestVerificationCode(email, verificationToken || undefined);
+      toast.success("Verification code sent!");
+      setTimeLeft(60);
+      setCanResend(false);
+      setCode(["", "", "", "", "", ""]);
+      inputRefs.current[0]?.focus();
+    } catch {
+      // Error is handled by the store and useEffect
+    } finally {
+      setIsResending(false);
+    }
   };
-
-  if (isVerified) {
-    return (
-      <div className="bg-background relative flex h-screen items-center justify-center overflow-hidden p-4">
-        {/* Background Glow Effect - positioned at bottom behind everything */}
-        <div className="absolute right-0 bottom-0 left-0 z-0">
-          <Glow
-            variant="top"
-            className="animate-appear-zoom opacity-0 delay-1000"
-          />
-        </div>
-
-        {/* Content Container */}
-        <div className="relative z-20 w-full max-w-full">
-          <div className="mx-auto w-full max-w-md">
-            {/* Success Message */}
-            <div className="animate-in fade-in text-center duration-500">
-              <Badge variant="outline" className="mb-6">
-                <UniTrack className="mr-2 size-4" />
-                <span className="text-muted-foreground">Verified</span>
-              </Badge>
-
-              <div className="animate-in zoom-in mb-6 delay-100 duration-700">
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/20 text-green-500">
-                  <MailIcon className="size-8" />
-                </div>
-              </div>
-
-              <h1 className="from-foreground to-foreground/80 mb-4 bg-gradient-to-r bg-clip-text text-2xl font-bold text-transparent sm:text-3xl">
-                Email Verified!
-              </h1>
-
-              <p className="text-muted-foreground mb-6 text-sm leading-relaxed">
-                Your email address has been successfully verified. You can now
-                access all UniTrack features.
-              </p>
-
-              <Card className="animate-in slide-in-from-bottom border-border/50 bg-background/80 p-6 backdrop-blur-sm delay-200 duration-600">
-                <Button asChild className="w-full" size="lg">
-                  <Link href="/dashboard">
-                    Continue to Dashboard
-                    <ArrowRight className="ml-2 size-4" />
-                  </Link>
-                </Button>
-              </Card>
-            </div>
-
-            {/* Background Glow Effect - positioned at bottom like Hero */}
-            <div className="relative w-full pt-12">
-              <Glow
-                variant="top"
-                className="animate-appear-zoom opacity-0 delay-1000"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="bg-background relative flex h-screen items-center justify-center overflow-hidden p-4">
@@ -166,7 +164,8 @@ export default function VerifyCodeForm() {
             </h1>
 
             <p className="text-muted-foreground text-sm">
-              We&apos;ve sent a 6-digit verification code to your email address
+              We&apos;ve sent a 6-digit verification code to{" "}
+              <span className="text-foreground font-medium">{email}</span>
             </p>
           </div>
 
@@ -206,10 +205,19 @@ export default function VerifyCodeForm() {
                 type="submit"
                 className="w-full"
                 size="lg"
-                disabled={code.some((digit) => !digit)}
+                disabled={code.some((digit) => !digit) || isLoading}
               >
-                Verify Code
-                <ArrowRight className="ml-2 size-4" />
+                {isLoading ? (
+                  <>
+                    <LoaderIcon className="mr-2 size-4 animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  <>
+                    Verify Code
+                    <ArrowRight className="ml-2 size-4" />
+                  </>
+                )}
               </Button>
             </form>
 

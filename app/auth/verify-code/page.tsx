@@ -1,5 +1,15 @@
+import { Suspense } from "react";
+
 import VerifyCodeForm from "@/components/Auth/verify-code";
 
-export default function VerifyCodePage() {
+function VerifyCodeContent() {
   return <VerifyCodeForm />;
+}
+
+export default function VerifyCodePage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <VerifyCodeContent />
+    </Suspense>
+  );
 }

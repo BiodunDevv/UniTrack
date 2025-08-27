@@ -8,30 +8,33 @@ import Navbar from "../components/Landing/NavBar";
 import Specification from "../components/Landing/Specifications";
 import Stats from "../components/Landing/Stats";
 import Technologies from "../components/Landing/Technologies";
+import PageLoader from "../components/ui/page-loader";
 
 export default function Home() {
   return (
-    <main className="bg-background text-foreground min-h-screen w-full overflow-hidden">
-      <Navbar />
-      <Hero />
-      <Technologies />
-      <section id="features">
-        <Features />
-      </section>
-      <Stats />
-      <section id="workflow">
-        <HowItWorks />
-      </section>
-      <section id="technology">
-        <Specification />
-      </section>
-      <section id="faq">
-        <FAQ />
-      </section>
-      <section id="cta">
-        <CTA />
-      </section>
-      <Footer />
-    </main>
+    <PageLoader minLoadTime={1200}>
+      <main className="bg-background text-foreground min-h-screen w-full overflow-hidden">
+        <Navbar />
+        <Hero />
+        <Technologies />
+        <section id="features">
+          <Features />
+        </section>
+        <Stats />
+        <section id="workflow">
+          <HowItWorks />
+        </section>
+        <section id="technology">
+          <Specification />
+        </section>
+        <section id="faq">
+          <FAQ />
+        </section>
+        <section id="cta">
+          <CTA />
+        </section>
+        <Footer />
+      </main>
+    </PageLoader>
   );
 }
