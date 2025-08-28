@@ -70,11 +70,13 @@ export default function NavBar({ className }: NavBarProps) {
   ];
 
   return (
-    <header className={cn("fixed top-0 right-0 left-0 z-50 p-4", className)}>
+    <header
+      className={cn("fixed top-0 right-0 left-0 z-50 p-2 sm:p-4", className)}
+    >
       <div className="mx-auto max-w-7xl">
         <div
           className={cn(
-            "flex items-center justify-between rounded-2xl border border-transparent px-4 py-3 transition-all duration-300 ease-out",
+            "flex items-center justify-between rounded-2xl border border-transparent px-3 py-2 transition-all duration-300 ease-out sm:px-4 sm:py-3",
             isScrolled
               ? "bg-background/40 border-border/50 shadow-lg shadow-black/5 backdrop-blur-2xl"
               : "bg-transparent",

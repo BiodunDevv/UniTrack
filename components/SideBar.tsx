@@ -6,8 +6,6 @@ import {
   GraduationCap,
   PanelRightClose,
   Plus,
-  UserCheck,
-  Users,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
@@ -124,44 +122,6 @@ export function CustomSidebar({ onClose }: CustomSidebarProps) {
           {
             title: "Create Course",
             url: "/course/create",
-          },
-        ],
-      },
-      {
-        title: "Attendance",
-        url: "/submit",
-        icon: UserCheck,
-        items: [
-          {
-            title: "Submit Attendance",
-            url: "/submit",
-          },
-        ],
-      },
-      {
-        title: "Authentication",
-        url: "/auth",
-        icon: Users,
-        items: [
-          {
-            title: "Sign In",
-            url: "/auth/signin",
-          },
-          {
-            title: "Sign Up",
-            url: "/auth/signup",
-          },
-          {
-            title: "Forgot Password",
-            url: "/auth/forgot-password",
-          },
-          {
-            title: "Reset Password",
-            url: "/auth/reset-password",
-          },
-          {
-            title: "Verify Code",
-            url: "/auth/verify-code",
           },
         ],
       },

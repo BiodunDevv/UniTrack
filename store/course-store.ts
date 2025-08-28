@@ -346,7 +346,7 @@ export const useCourseStore = create<CourseState>()(
         }
       },
 
-      getAllCourses: async (page = 1, limit = 10) => {
+      getAllCourses: async (page = 1, limit = 8) => {
         set({ isLoading: true, error: null });
         try {
           const response = await apiCall(

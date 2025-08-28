@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, CheckCircle, Copy, X } from "lucide-react";
+import { AlertCircle, CheckCircle, Copy, PrinterIcon } from "lucide-react";
 import React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -57,47 +57,47 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-md sm:w-full sm:max-w-lg">
+      <DialogContent className="w-[95vw] max-w-lg sm:w-full">
         <DialogHeader>
-          <DialogTitle className="sr-only">
+          <DialogTitle className="text-center">
             {isSuccess ? "Attendance Submitted" : "Submission Status"}
           </DialogTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="absolute top-4 right-4 z-10"
-            onClick={() => onOpenChange(false)}
-          >
-            <X className="h-4 w-4" />
-          </Button>
         </DialogHeader>
 
-        <div className="space-y-6 p-2">
-          {/* Header */}
+        <div className="space-y-6">
+          {/* Status Header */}
           <div className="text-center">
             {isSuccess ? (
               <div className="space-y-3">
-                <CheckCircle className="mx-auto h-16 w-16 text-green-500 sm:h-20 sm:w-20" />
-                <h2 className="text-xl font-bold text-green-700 sm:text-2xl">
-                  Attendance Submitted Successfully!
-                </h2>
-                <p className="text-muted-foreground text-sm sm:text-base">
-                  {result.message}
-                </p>
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10">
+                  <CheckCircle className="h-8 w-8 text-green-500" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-green-700 dark:text-green-400">
+                    Success!
+                  </h3>
+                  <p className="text-muted-foreground text-sm">
+                    {result.message}
+                  </p>
+                </div>
               </div>
             ) : (
               <div className="space-y-3">
-                <AlertCircle className="mx-auto h-16 w-16 text-orange-500 sm:h-20 sm:w-20" />
-                <h2 className="text-xl font-bold text-orange-700 sm:text-2xl">
-                  {isAlreadySubmitted
-                    ? "Attendance Already Submitted"
-                    : isDeviceUsed
-                      ? "Device Already Used"
-                      : "Submission Failed"}
-                </h2>
-                <p className="text-muted-foreground text-sm sm:text-base">
-                  {result.error}
-                </p>
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-orange-500/10">
+                  <AlertCircle className="h-8 w-8 text-orange-500" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-orange-700 dark:text-orange-400">
+                    {isAlreadySubmitted
+                      ? "Already Submitted"
+                      : isDeviceUsed
+                        ? "Device Already Used"
+                        : "Submission Failed"}
+                  </h3>
+                  <p className="text-muted-foreground text-sm">
+                    {result.error}
+                  </p>
+                </div>
               </div>
             )}
           </div>
@@ -105,13 +105,14 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({
           {/* Success Details */}
           {isSuccess && result.record && (
             <div className="space-y-4">
-              <div className="bg-muted/50 space-y-4 rounded-lg p-4 sm:p-6">
-                <div className="grid grid-cols-1 gap-3 text-sm sm:text-base">
+              <div className="bg-muted/50 space-y-4 rounded-lg p-4">
+                <h4 className="text-sm font-medium">Submission Details</h4>
+                <div className="grid grid-cols-1 gap-3 text-sm">
                   <div className="flex flex-col gap-1 sm:flex-row sm:justify-between">
                     <span className="text-muted-foreground font-medium">
                       Student:
                     </span>
-                    <span className="text-right font-semibold">
+                    <span className="font-semibold">
                       {result.record.student_name}
                     </span>
                   </div>
@@ -119,15 +120,13 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({
                     <span className="text-muted-foreground font-medium">
                       Matric No:
                     </span>
-                    <span className="text-right font-mono">
-                      {result.record.matric_no}
-                    </span>
+                    <span className="font-mono">{result.record.matric_no}</span>
                   </div>
                   <div className="flex flex-col gap-1 sm:flex-row sm:justify-between">
                     <span className="text-muted-foreground font-medium">
                       Course:
                     </span>
-                    <span className="text-right font-semibold">
+                    <span className="font-semibold">
                       {result.record.course}
                     </span>
                   </div>
@@ -135,7 +134,7 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({
                     <span className="text-muted-foreground font-medium">
                       Session Code:
                     </span>
-                    <span className="text-right font-mono">
+                    <span className="font-mono">
                       {result.record.session_code}
                     </span>
                   </div>
@@ -143,7 +142,7 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({
                     <span className="text-muted-foreground font-medium">
                       Status:
                     </span>
-                    <span className="text-right font-semibold text-green-600 capitalize">
+                    <span className="font-semibold text-green-600 capitalize">
                       {result.record.status}
                     </span>
                   </div>
@@ -151,34 +150,31 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({
                     <span className="text-muted-foreground font-medium">
                       Submitted:
                     </span>
-                    <span className="text-right text-sm">
+                    <span className="text-sm">
                       {formatDateTime(result.record.submitted_at)}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Receipt */}
+              {/* Receipt Section */}
               <div className="space-y-3">
-                <label className="text-sm font-semibold sm:text-base">
-                  Receipt ID:
-                </label>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <code className="bg-muted flex-1 rounded-lg px-3 py-2 text-xs break-all sm:text-sm">
+                <h4 className="text-sm font-medium">Receipt ID</h4>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <code className="bg-muted flex-1 rounded px-3 py-2 text-xs break-all">
                     {result.record.receipt}
                   </code>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => copyToClipboard(result.record!.receipt)}
-                    className="w-full sm:w-auto"
+                    className="shrink-0"
                   >
-                    <Copy className="mr-2 h-3 w-3 sm:mr-1" />
-                    <span className="sm:hidden">Copy Receipt</span>
-                    <span className="hidden sm:inline">Copy</span>
+                    <Copy className="mr-2 h-3 w-3" />
+                    Copy
                   </Button>
                 </div>
-                <p className="text-muted-foreground text-xs sm:text-sm">
+                <p className="text-muted-foreground text-xs">
                   Save this receipt ID for your records
                 </p>
               </div>
@@ -187,20 +183,20 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({
 
           {/* Error Details for Already Submitted */}
           {isAlreadySubmitted && result.existing_record && (
-            <div className="space-y-3 rounded-lg border border-orange-200 bg-orange-50 p-4 sm:p-6 dark:border-orange-800 dark:bg-orange-950">
-              <h3 className="font-semibold text-orange-800 sm:text-lg dark:text-orange-200">
+            <div className="space-y-3 rounded-lg border border-orange-200 bg-orange-50 p-4 dark:border-orange-800 dark:bg-orange-950">
+              <h4 className="font-medium text-orange-800 dark:text-orange-200">
                 Previous Submission Found
-              </h3>
-              <div className="space-y-2 text-sm text-orange-700 sm:text-base dark:text-orange-300">
+              </h4>
+              <div className="space-y-2 text-sm text-orange-700 dark:text-orange-300">
                 <div className="flex flex-col gap-1 sm:flex-row sm:justify-between">
-                  <span className="font-medium">Status:</span>
-                  <span className="font-semibold capitalize">
+                  <span>Status:</span>
+                  <span className="font-medium capitalize">
                     {result.existing_record.status}
                   </span>
                 </div>
                 <div className="flex flex-col gap-1 sm:flex-row sm:justify-between">
-                  <span className="font-medium">Submitted:</span>
-                  <span className="text-sm">
+                  <span>Submitted:</span>
+                  <span>
                     {formatDateTime(result.existing_record.submitted_at)}
                   </span>
                 </div>
@@ -210,8 +206,8 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({
 
           {/* Device Error Details */}
           {isDeviceUsed && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-4 sm:p-6 dark:border-red-800 dark:bg-red-950">
-              <p className="text-sm text-red-700 sm:text-base dark:text-red-300">
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950">
+              <p className="text-sm text-red-700 dark:text-red-300">
                 This device has already been used for attendance in this
                 session. Each student must use their own device for security
                 purposes.
@@ -219,14 +215,25 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({
             </div>
           )}
 
-          {/* Actions */}
-          <div className="flex justify-center pt-4">
+          {/* Action Buttons */}
+          <div className="flex flex-col gap-3 pt-4 sm:flex-row">
             <Button
               onClick={() => onOpenChange(false)}
-              className="w-full transition-transform duration-200 hover:scale-105 sm:w-auto sm:min-w-[120px]"
+              className="w-full sm:w-auto sm:flex-1"
+              variant={isSuccess ? "default" : "outline"}
             >
-              Close
+              {isSuccess ? "Continue" : "Close"}
             </Button>
+            {isSuccess && (
+              <Button
+                variant="outline"
+                onClick={() => window.print()}
+                className="w-full sm:w-auto sm:flex-1"
+              >
+                <PrinterIcon className="mr-2 h-4 w-4" />
+                Print Receipt
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>

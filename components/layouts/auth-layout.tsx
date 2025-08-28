@@ -54,28 +54,28 @@ export function AuthLayout({
       <div className="absolute inset-0 z-0">
         <Glow
           variant="bottom"
-        className="animate-appear-zoom fixed bottom-50 left-1/2 z-0 -translate-x-1/2 opacity-0 delay-1000 [&>div]:opacity-15 [&>div]:dark:opacity-60"
+          className="animate-appear-zoom fixed bottom-50 left-1/2 z-0 -translate-x-1/2 opacity-0 delay-1000 [&>div]:opacity-15 [&>div]:dark:opacity-60"
         />
       </div>
-
-      {/* Back Button - Fixed Position */}
-      {showBackButton && (
-        <div className="fixed top-6 left-6 z-50">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleBackClick}
-            className="hover:bg-background/80 bg-background/60 backdrop-blur-sm transition-all duration-200 hover:scale-105"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            {backText === "← Back to home" ? "Back" : backText}
-          </Button>
-        </div>
-      )}
 
       {/* Content Container */}
       <div className="relative z-10 w-full">
         <div className={`mx-auto w-full ${maxWidthClasses[maxWidth]}`}>
+          {/* Back Button - Positioned relative to content */}
+          {showBackButton && (
+            <div className="mb-6">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleBackClick}
+                className="hover:bg-background/80 bg-background/60 backdrop-blur-sm transition-all duration-200 hover:scale-105"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                {backText === "← Back to home" ? "Back" : backText}
+              </Button>
+            </div>
+          )}
+
           {/* Header */}
           <div className="animate-fade-in mb-8 text-center">
             <Badge variant="outline" className="mb-4">
