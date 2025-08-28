@@ -3,9 +3,7 @@
 import {
   BarChart3,
   BookOpen,
-  FileText,
   GraduationCap,
-  MapPin,
   PanelRightClose,
   Plus,
   UserCheck,
@@ -110,61 +108,7 @@ export function CustomSidebar({ onClose }: CustomSidebarProps) {
         items: [
           {
             title: "Overview",
-            url: "/dashboard/overview",
-          },
-          {
-            title: "Analytics",
-            url: "/dashboard/analytics",
-          },
-          {
-            title: "Reports",
-            url: "/dashboard/reports",
-          },
-        ],
-      },
-      {
-        title: "Attendance",
-        url: "/dashboard/attendance",
-        icon: UserCheck,
-        items: [
-          {
-            title: "Live Sessions",
-            url: "/dashboard/attendance/live",
-          },
-          {
-            title: "Session History",
-            url: "/dashboard/attendance/history",
-          },
-          {
-            title: "Create Session",
-            url: "/dashboard/attendance/create",
-          },
-          {
-            title: "QR Codes",
-            url: "/dashboard/attendance/qr-codes",
-          },
-        ],
-      },
-      {
-        title: "Students",
-        url: "/dashboard/students",
-        icon: Users,
-        items: [
-          {
-            title: "All Students",
-            url: "/dashboard/students/all",
-          },
-          {
-            title: "Add Student",
-            url: "/dashboard/students/add",
-          },
-          {
-            title: "Import Students",
-            url: "/dashboard/students/import",
-          },
-          {
-            title: "Student Groups",
-            url: "/dashboard/students/groups",
+            url: "/dashboard",
           },
         ],
       },
@@ -181,55 +125,43 @@ export function CustomSidebar({ onClose }: CustomSidebarProps) {
             title: "Create Course",
             url: "/course/create",
           },
+        ],
+      },
+      {
+        title: "Attendance",
+        url: "/submit",
+        icon: UserCheck,
+        items: [
           {
-            title: "Course Schedule",
-            url: "/course/schedule",
-          },
-          {
-            title: "Enrollment",
-            url: "/course/enrollment",
+            title: "Submit Attendance",
+            url: "/submit",
           },
         ],
       },
       {
-        title: "Locations",
-        url: "/dashboard/locations",
-        icon: MapPin,
+        title: "Authentication",
+        url: "/auth",
+        icon: Users,
         items: [
           {
-            title: "Classrooms",
-            url: "/dashboard/locations/classrooms",
+            title: "Sign In",
+            url: "/auth/signin",
           },
           {
-            title: "Add Location",
-            url: "/dashboard/locations/add",
+            title: "Sign Up",
+            url: "/auth/signup",
           },
           {
-            title: "GPS Settings",
-            url: "/dashboard/locations/gps",
-          },
-        ],
-      },
-      {
-        title: "Reports",
-        url: "/dashboard/reports",
-        icon: FileText,
-        items: [
-          {
-            title: "Attendance Reports",
-            url: "/dashboard/reports/attendance",
+            title: "Forgot Password",
+            url: "/auth/forgot-password",
           },
           {
-            title: "Student Performance",
-            url: "/dashboard/reports/performance",
+            title: "Reset Password",
+            url: "/auth/reset-password",
           },
           {
-            title: "Export Data",
-            url: "/dashboard/reports/export",
-          },
-          {
-            title: "Custom Reports",
-            url: "/dashboard/reports/custom",
+            title: "Verify Code",
+            url: "/auth/verify-code",
           },
         ],
       },

@@ -8,8 +8,12 @@ import {
   Clock,
   Hash,
   Loader2,
+  MapPin,
+  Monitor,
   RefreshCw,
+  Search,
   Users,
+  X,
   XCircle,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
@@ -19,7 +23,14 @@ import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
@@ -94,6 +105,7 @@ export default function LiveSessionPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [autoRefresh, setAutoRefresh] = React.useState(true);
+  const [searchQuery, setSearchQuery] = React.useState("");
 
   // Fetch live session data using the correct API endpoint
   const fetchLiveData = React.useCallback(
@@ -386,91 +398,302 @@ export default function LiveSessionPage() {
         </div>
 
         {/* Recent Submissions */}
-        <Card className="animate-appear border-border/50 bg-card/50 hover:border-border hover:bg-card/80 backdrop-blur-sm transition-all duration-300">
+        <Card className="group border-border/50 bg-card/50 hover:bg-card/80 hover:shadow-primary/5 backdrop-blur-sm transition-all duration-500">
           <CardHeader>
-            <CardTitle className="flex flex-col items-center justify-between sm:flex-row">
-              <span className="flex items-center gap-2">
-                <Activity className="h-5 w-5" />
-                Recent Submissions
-              </span>
-              <div className="text-muted-foreground flex flex-col items-center gap-2 text-sm font-normal sm:flex-row">
-                <span>
-                  Last updated: {formatDateTime(live_stats.last_updated)}
-                </span>
-                {live_stats.last_submission && (
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Recent Submissions
+                </CardTitle>
+                <CardDescription>
+                  Live attendance submissions for this session
+                </CardDescription>
+                <div className="text-muted-foreground mt-2 flex flex-wrap gap-4 text-sm">
                   <span>
-                    Last submission:{" "}
-                    {formatDateTime(live_stats.last_submission)}
+                    Last updated: {formatDateTime(live_stats.last_updated)}
                   </span>
-                )}
-                <span>Window: {live_stats.time_window_minutes} minutes</span>
+                  {live_stats.last_submission && (
+                    <span>
+                      Last submission:{" "}
+                      {formatDateTime(live_stats.last_submission)}
+                    </span>
+                  )}
+                  <span>Window: {live_stats.time_window_minutes} minutes</span>
+                </div>
               </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {recent_submissions.length === 0 ? (
-              <div className="py-8 text-center">
-                <Users className="text-muted-foreground/50 mx-auto mb-4 h-12 w-12" />
-                <p className="text-muted-foreground">No submissions yet</p>
-                <p className="text-muted-foreground mt-2 text-sm">
-                  Waiting for students to mark attendance...
-                </p>
-              </div>
-            ) : (
-              <div className="max-h-96 space-y-3 overflow-y-auto">
-                {recent_submissions.map((submission) => (
-                  <div
-                    key={submission._id}
-                    className="bg-muted/50 flex items-center justify-between rounded-lg p-4"
+              {/* Search Bar */}
+              <div className="relative w-full sm:w-80">
+                <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                <Input
+                  type="text"
+                  placeholder="Search by name, matric no..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pr-10 pl-10"
+                />
+                {searchQuery && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute top-1/2 right-1 h-7 w-7 -translate-y-1/2 p-0"
                   >
-                    <div className="flex items-center gap-3">
-                      {getStatusIcon(submission.status)}
-                      <div>
-                        <p className="font-medium">
-                          {submission.student_id.name}
-                        </p>
-                        <p className="text-muted-foreground text-sm">
-                          {submission.matric_no_submitted}
-                        </p>
-                        <p className="text-muted-foreground text-xs">
-                          Location: {submission.lat.toFixed(6)},{" "}
-                          {submission.lng.toFixed(6)}
-                          {submission.accuracy && ` (±${submission.accuracy}m)`}
-                        </p>
-                        {submission.device_fingerprint && (
-                          <p className="text-muted-foreground font-mono text-xs">
-                            Device:{" "}
-                            {submission.device_fingerprint.substring(0, 8)}...
-                          </p>
-                        )}
-                        {submission.receipt_signature && (
-                          <p className="text-muted-foreground font-mono text-xs">
-                            Receipt:{" "}
-                            {submission.receipt_signature.substring(0, 8)}...
-                          </p>
-                        )}
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0 sm:p-6">
+            {(() => {
+              const filteredSubmissions = recent_submissions.filter(
+                (submission) => {
+                  if (!searchQuery) return true;
+                  const query = searchQuery.toLowerCase();
+                  return (
+                    submission.student_id.name.toLowerCase().includes(query) ||
+                    submission.matric_no_submitted
+                      .toLowerCase()
+                      .includes(query) ||
+                    submission.status.toLowerCase().includes(query)
+                  );
+                },
+              );
+
+              if (filteredSubmissions.length === 0) {
+                return searchQuery ? (
+                  <div className="px-6 py-8 text-center">
+                    <p className="text-muted-foreground text-sm">
+                      No submissions found matching &quot;{searchQuery}&quot;
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSearchQuery("")}
+                      className="mt-2"
+                    >
+                      Clear search
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="px-6 py-8 text-center">
+                    <Users className="text-muted-foreground/50 mx-auto mb-4 h-12 w-12" />
+                    <p className="text-muted-foreground">No submissions yet</p>
+                    <p className="text-muted-foreground mt-2 text-sm">
+                      Waiting for students to mark attendance...
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <>
+                  {/* Mobile Horizontal Scrollable Table */}
+                  <div className="block sm:hidden">
+                    <div className="overflow-x-auto">
+                      <div className="min-w-[800px] px-4">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-border border-b">
+                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
+                                #
+                              </th>
+                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
+                                Student
+                              </th>
+                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
+                                Matric No
+                              </th>
+                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
+                                Location
+                              </th>
+                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
+                                Status
+                              </th>
+                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
+                                Time
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredSubmissions.map((submission, index) => (
+                              <tr
+                                key={submission._id}
+                                className="border-border/50 hover:bg-muted/50 border-b transition-colors"
+                              >
+                                <td className="px-2 py-3 whitespace-nowrap">
+                                  <span className="text-xs font-medium">
+                                    #{index + 1}
+                                  </span>
+                                </td>
+                                <td className="px-2 py-3">
+                                  <div className="flex min-w-[120px] items-center gap-2">
+                                    {getStatusIcon(submission.status)}
+                                    <p className="truncate text-xs font-medium">
+                                      {submission.student_id.name}
+                                    </p>
+                                  </div>
+                                </td>
+                                <td className="px-2 py-3 whitespace-nowrap">
+                                  <p className="text-muted-foreground font-mono text-xs">
+                                    {submission.matric_no_submitted}
+                                  </p>
+                                </td>
+                                <td className="px-2 py-3">
+                                  <div className="min-w-[120px]">
+                                    <div className="flex items-center gap-1">
+                                      <MapPin className="text-muted-foreground h-3 w-3" />
+                                      <span className="text-muted-foreground text-xs">
+                                        {submission.lat.toFixed(4)},{" "}
+                                        {submission.lng.toFixed(4)}
+                                      </span>
+                                    </div>
+                                    {submission.accuracy && (
+                                      <p className="text-muted-foreground text-xs">
+                                        ±{submission.accuracy}m
+                                      </p>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-2 py-3 whitespace-nowrap">
+                                  <Badge
+                                    variant="outline"
+                                    className={getStatusColor(
+                                      submission.status,
+                                    )}
+                                  >
+                                    {submission.status}
+                                  </Badge>
+                                </td>
+                                <td className="px-2 py-3">
+                                  <div className="min-w-[100px]">
+                                    <p className="text-xs">
+                                      {formatDateTime(submission.submitted_at)}
+                                    </p>
+                                    {submission.reason && (
+                                      <p className="text-muted-foreground text-xs italic">
+                                        {submission.reason}
+                                      </p>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <Badge
-                        variant="outline"
-                        className={getStatusColor(submission.status)}
-                      >
-                        {submission.status}
-                      </Badge>
-                      <p className="text-muted-foreground mt-1 text-sm">
-                        {formatDateTime(submission.submitted_at)}
-                      </p>
-                      {submission.reason && (
-                        <p className="text-muted-foreground mt-1 text-xs italic">
-                          {submission.reason}
-                        </p>
-                      )}
+                  </div>
+
+                  {/* Desktop Table */}
+                  <div className="hidden sm:block">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-border border-b">
+                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
+                              #
+                            </th>
+                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
+                              Student Name
+                            </th>
+                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
+                              Matric Number
+                            </th>
+                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
+                              Location
+                            </th>
+                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
+                              Device
+                            </th>
+                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
+                              Status
+                            </th>
+                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
+                              Submitted At
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredSubmissions.map((submission, index) => (
+                            <tr
+                              key={submission._id}
+                              className="border-border/50 hover:bg-muted/50 border-b transition-colors"
+                            >
+                              <td className="px-4 py-4">
+                                <span className="text-sm font-medium">
+                                  #{index + 1}
+                                </span>
+                              </td>
+                              <td className="px-4 py-4">
+                                <div className="flex items-center gap-3">
+                                  {getStatusIcon(submission.status)}
+                                  <p className="text-sm font-medium">
+                                    {submission.student_id.name}
+                                  </p>
+                                </div>
+                              </td>
+                              <td className="px-4 py-4">
+                                <p className="text-muted-foreground font-mono text-sm">
+                                  {submission.matric_no_submitted}
+                                </p>
+                              </td>
+                              <td className="px-4 py-4">
+                                <div className="flex items-center gap-1">
+                                  <MapPin className="text-muted-foreground h-3 w-3" />
+                                  <span className="text-muted-foreground text-xs">
+                                    {submission.lat.toFixed(4)},{" "}
+                                    {submission.lng.toFixed(4)}
+                                  </span>
+                                </div>
+                                {submission.accuracy && (
+                                  <p className="text-muted-foreground text-xs">
+                                    ±{submission.accuracy}m
+                                  </p>
+                                )}
+                              </td>
+                              <td className="px-4 py-4">
+                                <div className="flex items-center gap-1">
+                                  <Monitor className="text-muted-foreground h-3 w-3" />
+                                  <span className="text-muted-foreground font-mono text-xs">
+                                    {submission.device_fingerprint.substring(
+                                      0,
+                                      8,
+                                    )}
+                                    ...
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-4">
+                                <Badge
+                                  variant="outline"
+                                  className={getStatusColor(submission.status)}
+                                >
+                                  {submission.status}
+                                </Badge>
+                              </td>
+                              <td className="px-4 py-4">
+                                <div className="text-sm">
+                                  <p>
+                                    {formatDateTime(submission.submitted_at)}
+                                  </p>
+                                  {submission.reason && (
+                                    <p className="text-muted-foreground text-xs italic">
+                                      {submission.reason}
+                                    </p>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
 
