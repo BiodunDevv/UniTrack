@@ -48,6 +48,13 @@ export default function Hero({ className }: HeroProps) {
     },
   ];
 
+  const submitButton = {
+    href: "/submit",
+    text: "Submit Attendance",
+    variant: "outline" as const,
+    iconRight: <ArrowRightIcon className="ml-2 size-4" />,
+  };
+
   const authenticatedButtons = [
     {
       href: "/dashboard",
@@ -107,21 +114,40 @@ export default function Hero({ className }: HeroProps) {
             </div>
           </div>
 
-          <div className="animate-appear relative z-10 flex justify-center gap-4 opacity-0 delay-300">
-            {(displayAuthenticated ? authenticatedButtons : buttons).map(
-              (button, index) => (
+          <div className="animate-appear relative z-10 flex flex-col items-center gap-4 opacity-0 delay-300">
+            <div className="flex justify-center gap-4">
+              {(displayAuthenticated ? authenticatedButtons : buttons).map(
+                (button, index) => (
+                  <Button
+                    key={index}
+                    variant={button.variant || "default"}
+                    size="lg"
+                    asChild
+                  >
+                    <a href={button.href}>
+                      {button.text}
+                      {button.iconRight}
+                    </a>
+                  </Button>
+                ),
+              )}
+            </div>
+
+            {/* Submit Attendance Button for non-authenticated users */}
+            {!displayAuthenticated && (
+              <div className="flex justify-center">
                 <Button
-                  key={index}
-                  variant={button.variant || "default"}
+                  variant={submitButton.variant}
                   size="lg"
                   asChild
+                  className="border-primary/20 hover:border-primary/40"
                 >
-                  <a href={button.href}>
-                    {button.text}
-                    {button.iconRight}
+                  <a href={submitButton.href}>
+                    {submitButton.text}
+                    {submitButton.iconRight}
                   </a>
                 </Button>
-              ),
+              </div>
             )}
           </div>
 

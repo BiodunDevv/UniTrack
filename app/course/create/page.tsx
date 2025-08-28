@@ -7,6 +7,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
+import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -28,13 +29,16 @@ export default function CreateCoursePage() {
   const [formData, setFormData] = useState({
     course_code: "",
     title: "",
+    level: 100,
   });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: name === "level" ? parseInt(value) : value,
     }));
   };
 
@@ -50,12 +54,24 @@ export default function CreateCoursePage() {
       await createCourse({
         course_code: formData.course_code.trim(),
         title: formData.title.trim(),
+        level: formData.level,
       });
 
       toast.success("Course created successfully!");
       router.push("/course");
-    } catch (error) {
-      toast.error("Failed to create course");
+    } catch (error: unknown) {
+      // Handle duplicate course code error
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      if (errorMessage === "Internal server error") {
+        toast.error("Course code already exists", {
+          description: "Please choose a different course code.",
+        });
+      } else {
+        toast.error("Failed to create course", {
+          description: errorMessage || "An unexpected error occurred",
+        });
+      }
       console.error("Failed to create course:", error);
     }
   };
@@ -73,14 +89,23 @@ export default function CreateCoursePage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 p-4 lg:p-6">
+      <div className="flex h-screen flex-col space-y-6 p-4 lg:p-6">
+        {/* Breadcrumb */}
+        <div className="animate-appear opacity-0">
+          <Breadcrumb
+            items={[
+              { label: "Courses", href: "/course" },
+              { label: "Create Course", current: true },
+            ]}
+          />
+        </div>
+
         {/* Header Section */}
-        <div className="animate-appear flex flex-col gap-4 opacity-0 delay-100 lg:flex-row lg:items-center">
+        <div className="animate-appear flex flex-col gap-4 opacity-0 delay-100">
           <Button
-            variant="ghost"
             size="sm"
             onClick={handleGoBack}
-            className="hover:bg-accent hover:text-accent-foreground w-fit transition-all duration-300 hover:scale-105"
+            className="hover:bg-accent hover:text-accent-foreground w-fit transition-all duration-300 hover:scale-105 md:hidden"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Courses
@@ -96,8 +121,8 @@ export default function CreateCoursePage() {
         </div>
 
         {/* Form Section */}
-        <div className="animate-appear mx-auto max-w-2xl opacity-0 delay-200">
-          <Card className="border-border/50 bg-card/50 hover:border-border hover:bg-card/80 backdrop-blur-sm transition-all duration-500">
+        <div className="animate-appear max-w-4xl opacity-0 delay-200">
+          <Card className="border-border/50 bg-card/50 hover:border-border hover:bg-card/80 h-full backdrop-blur-sm transition-all duration-500">
             <CardHeader className="pb-6">
               <CardTitle className="flex items-center gap-2 text-lg lg:text-xl">
                 <div className="bg-primary/10 text-primary rounded-lg p-2">
@@ -109,28 +134,60 @@ export default function CreateCoursePage() {
                 Enter the basic information for your new course
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="animate-appear space-y-2 opacity-0 delay-300">
-                  <Label
-                    htmlFor="course_code"
-                    className="text-sm font-medium lg:text-base"
-                  >
-                    Course Code
-                  </Label>
-                  <Input
-                    id="course_code"
-                    name="course_code"
-                    type="text"
-                    placeholder="e.g., CS101, MATH201"
-                    value={formData.course_code}
-                    onChange={handleInputChange}
-                    required
-                    className="border-border/50 bg-background/50 hover:border-border focus:border-primary font-mono backdrop-blur-sm transition-all duration-300"
-                  />
-                  <p className="text-muted-foreground text-xs lg:text-sm">
-                    A unique identifier for the course (e.g., CS101, MATH201)
-                  </p>
+            <CardContent className="flex flex-col">
+              <form
+                onSubmit={handleSubmit}
+                className="flex flex-1 flex-col space-y-6"
+              >
+                <div className="grid flex-1 md:grid-cols-2">
+                  <div className="animate-appear space-y-2 opacity-0 delay-300">
+                    <Label
+                      htmlFor="course_code"
+                      className="text-sm font-medium lg:text-base"
+                    >
+                      Course Code
+                    </Label>
+                    <Input
+                      id="course_code"
+                      name="course_code"
+                      type="text"
+                      placeholder="e.g., CS101, MATH201"
+                      value={formData.course_code}
+                      onChange={handleInputChange}
+                      required
+                      className="border-border/50 bg-background/50 hover:border-border focus:border-primary font-mono backdrop-blur-sm transition-all duration-300"
+                    />
+                    <p className="text-muted-foreground text-xs lg:text-sm">
+                      A unique identifier for the course (e.g., CS101, MATH201)
+                    </p>
+                  </div>
+
+                  <div className="animate-appear space-y-2 opacity-0 delay-500">
+                    <Label
+                      htmlFor="level"
+                      className="text-sm font-medium lg:text-base"
+                    >
+                      Academic Level
+                    </Label>
+                    <select
+                      id="level"
+                      name="level"
+                      value={formData.level}
+                      onChange={handleInputChange}
+                      required
+                      className="border-border/50 bg-background/50 ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring hover:border-border focus:border-primary flex h-10 w-full rounded-md border px-3 py-2 text-sm backdrop-blur-sm transition-all duration-300 file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value={100}>100 Level (1st Year)</option>
+                      <option value={200}>200 Level (2nd Year)</option>
+                      <option value={300}>300 Level (3rd Year)</option>
+                      <option value={400}>400 Level (4th Year)</option>
+                      <option value={500}>500 Level (5th Year)</option>
+                      <option value={600}>600 Level (6th Year)</option>
+                    </select>
+                    <p className="text-muted-foreground text-xs lg:text-sm">
+                      The academic level for this course
+                    </p>
+                  </div>
                 </div>
 
                 <div className="animate-appear space-y-2 opacity-0 delay-400">
@@ -155,7 +212,7 @@ export default function CreateCoursePage() {
                   </p>
                 </div>
 
-                <div className="animate-appear opacity-0 delay-500">
+                <div className="animate-appear opacity-0 delay-600">
                   <Card className="border-border/30 bg-muted/30 backdrop-blur-sm">
                     <CardContent className="p-4">
                       <h4 className="mb-2 text-sm font-medium lg:text-base">
@@ -173,11 +230,21 @@ export default function CreateCoursePage() {
                   </Card>
                 </div>
 
-                <div className="animate-appear flex flex-col gap-3 pt-4 opacity-0 delay-600 sm:flex-row">
+                <div className="animate-appear flex flex-col gap-3 pt-6 opacity-0 delay-700 sm:flex-row sm:justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleGoBack}
+                    disabled={isLoading}
+                    className="border-border/50 bg-background/50 hover:bg-accent hover:text-accent-foreground order-2 transition-all duration-300 hover:scale-105 sm:order-1"
+                  >
+                    Cancel
+                  </Button>
+
                   <Button
                     type="submit"
                     disabled={isLoading}
-                    className="hover:shadow-primary/20 flex items-center justify-center gap-2 transition-all duration-300 hover:scale-105 hover:shadow-lg"
+                    className="hover:shadow-primary/20 order-1 flex items-center justify-center gap-2 transition-all duration-300 hover:scale-105 hover:shadow-lg sm:order-2"
                   >
                     {isLoading ? (
                       <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current"></div>
@@ -185,16 +252,6 @@ export default function CreateCoursePage() {
                       <Save className="h-4 w-4" />
                     )}
                     {isLoading ? "Creating..." : "Create Course"}
-                  </Button>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleGoBack}
-                    disabled={isLoading}
-                    className="border-border/50 bg-background/50 hover:bg-accent hover:text-accent-foreground transition-all duration-300 hover:scale-105"
-                  >
-                    Cancel
                   </Button>
                 </div>
               </form>

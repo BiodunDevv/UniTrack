@@ -120,27 +120,47 @@ export const useAuthStore = create<AuthState>()(
       registerTeacher: async (data: RegisterTeacherData) => {
         set({ isLoading: true, error: null });
         try {
-          const response = await apiCall("/register_teacher", {
+          const response = await fetch(`${API_BASE_URL}/register_teacher`, {
             method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
             body: JSON.stringify(data),
           });
 
-          // Check for success based on message or presence of registration token
-          if (
-            response.registrationToken ||
-            response.message?.includes("success")
-          ) {
+          const responseData = await response.json();
+          console.log("Registration response:", responseData);
+
+          if (response.ok) {
+            // Successful registration
+            if (
+              responseData.registrationToken ||
+              responseData.message?.includes("success")
+            ) {
+              set({
+                registrationToken: responseData.registrationToken,
+                isLoading: false,
+              });
+            } else {
+              throw new Error(responseData.message || "Registration failed");
+            }
+          } else {
+            // Handle registration errors (like email already exists)
+            const errorMessage =
+              responseData.error ||
+              responseData.message ||
+              "Registration failed";
             set({
-              registrationToken: response.registrationToken,
+              error: errorMessage,
               isLoading: false,
             });
-          } else {
-            throw new Error(response.message || "Registration failed");
+            throw new Error(errorMessage);
           }
         } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : "Registration failed";
           set({
-            error:
-              error instanceof Error ? error.message : "Registration failed",
+            error: errorMessage,
             isLoading: false,
           });
           throw error;
@@ -176,33 +196,49 @@ export const useAuthStore = create<AuthState>()(
       login: async (email: string, password: string) => {
         set({ isLoading: true, error: null });
         try {
-          const response = await apiCall("/login", {
+          const response = await fetch(`${API_BASE_URL}/login`, {
             method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
             body: JSON.stringify({ email, password }),
           });
-          console.log("Login response:", response);
 
-          // Check if login was successful
-          if (isSuccessResponse(response) && response.token && response.user) {
-            // User is verified and logged in
-            set({
-              user: response.user,
-              token: response.token,
-              isAuthenticated: true,
-              isLoading: false,
-            });
-          } else if (response.verificationToken) {
-            // User needs email verification
-            set({
-              verificationToken: response.verificationToken,
-              isLoading: false,
-            });
+          const data = await response.json();
+
+          if (response.ok) {
+            // Successful login
+            if (data.token && data.user) {
+              set({
+                user: data.user,
+                token: data.token,
+                isAuthenticated: true,
+                isLoading: false,
+              });
+            } else {
+              throw new Error(data.message || "Login failed");
+            }
           } else {
-            throw new Error(response.message || "Login failed");
+            if (data.error === "Email not verified" && data.verificationToken) {
+              set({
+                verificationToken: data.verificationToken,
+                error: data.error,
+                isLoading: false,
+              });
+            } else {
+              // Other errors (like invalid credentials)
+              set({
+                error: data.error || data.message || "Login failed",
+                isLoading: false,
+              });
+              throw new Error(data.error || data.message || "Login failed");
+            }
           }
         } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : "Login failed";
           set({
-            error: error instanceof Error ? error.message : "Login failed",
+            error: errorMessage,
             isLoading: false,
           });
           throw error;

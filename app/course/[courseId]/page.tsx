@@ -2,19 +2,23 @@
 
 import {
   Activity,
+  ArrowLeft,
   BarChart3,
   BookOpen,
   Clock,
   Download,
+  Edit,
   Eye,
   FileText,
   Loader2,
   Mail,
   Play,
+  Search,
   Settings,
   Square,
   Trash2,
   Users,
+  X,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import * as React from "react";
@@ -31,16 +35,19 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ConfirmationModal } from "@/components/ui/confirmation-modal";
 import { EndSessionModal } from "@/components/ui/end-session-modal";
+import { Input } from "@/components/ui/input";
+import { Pagination } from "@/components/ui/pagination";
 import { ReportDownloadModal } from "@/components/ui/report-download-modal";
 import { StartSessionModal } from "@/components/ui/start-session-modal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { UpdateCourseModal } from "@/components/ui/update-course-modal";
 import { useAuthStore } from "@/store/auth-store";
 import { useCourseStore } from "@/store/course-store";
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  "https://unitrack-backend-hd9s.onrender.com/api";
+  process.env.NEXT_PUBLIC_API_BASE_URL || "localhost:3000/api";
 
 // Function to get auth token from localStorage
 const getAuthToken = (): string | null => {
@@ -72,6 +79,7 @@ export default function CoursePage() {
     error,
     getCourse,
     startAttendanceSession,
+    updateCourse,
     removeStudentFromCourse,
     downloadCSVReport,
     downloadPDFReport,
@@ -107,6 +115,13 @@ export default function CoursePage() {
   const [currentPage, setCurrentPage] = React.useState(1);
   const sessionsPerPage = 4;
 
+  // Student pagination state
+  const [currentStudentPage, setCurrentStudentPage] = React.useState(1);
+  const studentsPerPage = 10;
+
+  // Student search state
+  const [studentSearchQuery, setStudentSearchQuery] = React.useState("");
+
   // Report download modal states
   const [showReportModal, setShowReportModal] = React.useState(false);
   const [reportType, setReportType] = React.useState<"csv" | "pdf">("csv");
@@ -116,6 +131,18 @@ export default function CoursePage() {
   const [removingStudentId, setRemovingStudentId] = React.useState<
     string | null
   >(null);
+
+  // Update course modal state
+  const [showUpdateCourseModal, setShowUpdateCourseModal] =
+    React.useState(false);
+
+  // Confirmation modal state for student removal
+  const [showConfirmationModal, setShowConfirmationModal] =
+    React.useState(false);
+  const [studentToRemove, setStudentToRemove] = React.useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   // Fetch course data on mount
   React.useEffect(() => {
@@ -321,16 +348,46 @@ export default function CoursePage() {
 
   // Student removal function with loading state
   const handleRemoveStudent = async (studentId: string) => {
-    setRemovingStudentId(studentId);
+    // Find the student to get their name for the confirmation dialog
+    const student = students.find((s) => s._id === studentId);
+    const studentName = student?.name || "this student";
+
+    // Set the student to remove and show confirmation modal
+    setStudentToRemove({ id: studentId, name: studentName });
+    setShowConfirmationModal(true);
+  };
+
+  // Confirm student removal
+  const confirmRemoveStudent = async () => {
+    if (!studentToRemove) return;
+
+    setRemovingStudentId(studentToRemove.id);
     try {
-      await removeStudentFromCourse(courseId, studentId);
+      await removeStudentFromCourse(courseId, studentToRemove.id);
       toast.success("Student removed successfully!");
     } catch {
       toast.error("Failed to remove student");
     } finally {
       setRemovingStudentId(null);
+      setShowConfirmationModal(false);
+      setStudentToRemove(null);
     }
   };
+
+  // Update course function
+  const handleUpdateCourse = async (
+    courseId: string,
+    data: { title?: string; level?: number },
+  ) => {
+    try {
+      await updateCourse(courseId, data);
+      // Refresh course data after update
+      getCourse(courseId);
+    } catch (error) {
+      throw error; // Let the modal handle the error
+    }
+  };
+
   const recentSessions = sessions.slice(0, 3);
 
   // Pagination logic for sessions tab
@@ -338,6 +395,33 @@ export default function CoursePage() {
   const startIndex = (currentPage - 1) * sessionsPerPage;
   const endIndex = startIndex + sessionsPerPage;
   const paginatedSessions = sessions.slice(startIndex, endIndex);
+
+  // Filter students based on search query
+  const filteredStudents = students.filter((student) => {
+    if (!studentSearchQuery) return true;
+    const query = studentSearchQuery.toLowerCase();
+    return (
+      student.name.toLowerCase().includes(query) ||
+      student.matric_no.toLowerCase().includes(query) ||
+      student.email.toLowerCase().includes(query)
+    );
+  });
+
+  // Pagination logic for students tab
+  const totalStudentPages = Math.ceil(
+    filteredStudents.length / studentsPerPage,
+  );
+  const studentStartIndex = (currentStudentPage - 1) * studentsPerPage;
+  const studentEndIndex = studentStartIndex + studentsPerPage;
+  const paginatedStudents = filteredStudents.slice(
+    studentStartIndex,
+    studentEndIndex,
+  );
+
+  // Reset student pagination when search query changes
+  React.useEffect(() => {
+    setCurrentStudentPage(1);
+  }, [studentSearchQuery]);
 
   if (isLoading && !currentCourse) {
     return (
@@ -396,6 +480,17 @@ export default function CoursePage() {
         {/* Header Section */}
         <div className="animate-appear flex flex-col gap-4 opacity-0 delay-100 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => router.push(`/course`)}
+                className="hover:bg-accent hover:text-accent-foreground transition-all duration-300 hover:scale-105 md:hidden"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Courses
+              </Button>
+            </div>
             <h1 className="from-foreground to-muted-foreground bg-gradient-to-r bg-clip-text text-3xl font-bold text-transparent lg:text-4xl">
               {currentCourse.title}
             </h1>
@@ -443,6 +538,31 @@ export default function CoursePage() {
                 </Button>
               </>
             )}
+
+            {/* Hide Add Students and Edit Course buttons when session is active */}
+            {!sessions.some(
+              (session) => session.is_active || session.status === "active",
+            ) && (
+              <>
+                <Button
+                  onClick={() => router.push(`/students/${courseId}`)}
+                  variant="outline"
+                  className="border-border/50 bg-background/50 transition-all duration-300 hover:scale-105 hover:bg-purple-600 hover:text-white hover:shadow-lg hover:shadow-purple-600/20"
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  View All Students
+                </Button>
+                <Button
+                  onClick={() => setShowUpdateCourseModal(true)}
+                  variant="outline"
+                  className="border-border/50 bg-background/50 transition-all duration-300 hover:scale-105 hover:bg-orange-600 hover:text-white hover:shadow-lg hover:shadow-orange-600/20"
+                >
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit Course
+                </Button>
+              </>
+            )}
+
             <Button
               onClick={() => setShowStartSessionModal(true)}
               className="bg-green-600 transition-all duration-300 hover:scale-105 hover:bg-green-700 hover:shadow-lg hover:shadow-green-600/20"
@@ -862,13 +982,38 @@ export default function CoursePage() {
             <TabsContent value="students" className="space-y-4">
               <Card className="animate-appear border-border/50 bg-card/50 hover:border-border hover:bg-card/80 backdrop-blur-sm transition-all duration-300">
                 <CardHeader>
-                  <CardTitle>Course Students</CardTitle>
-                  <CardDescription>
-                    Manage students enrolled in this course
-                  </CardDescription>
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <CardTitle>Course Students</CardTitle>
+                      <CardDescription>
+                        Manage students enrolled in this course
+                      </CardDescription>
+                    </div>
+                    {/* Search Bar */}
+                    <div className="relative w-full sm:w-80">
+                      <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                      <Input
+                        type="text"
+                        placeholder="Search by name, matric no, or email..."
+                        value={studentSearchQuery}
+                        onChange={(e) => setStudentSearchQuery(e.target.value)}
+                        className="pr-10 pl-10"
+                      />
+                      {studentSearchQuery && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setStudentSearchQuery("")}
+                          className="absolute top-1/2 right-1 h-7 w-7 -translate-y-1/2 p-0"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className="p-0 sm:p-6">
-                  {students.length > 0 ? (
+                  {filteredStudents.length > 0 ? (
                     <>
                       {/* Mobile Horizontal Scrollable Table */}
                       <div className="block sm:hidden">
@@ -895,14 +1040,14 @@ export default function CoursePage() {
                                 </tr>
                               </thead>
                               <tbody>
-                                {students.map((student, index) => (
+                                {paginatedStudents.map((student, index) => (
                                   <tr
                                     key={student._id}
                                     className="border-border/50 hover:bg-muted/50 border-b transition-colors"
                                   >
                                     <td className="px-2 py-3 whitespace-nowrap">
                                       <span className="text-xs font-medium">
-                                        #{index + 1}
+                                        #{studentStartIndex + index + 1}
                                       </span>
                                     </td>
                                     <td className="px-2 py-3">
@@ -913,7 +1058,7 @@ export default function CoursePage() {
                                       </div>
                                     </td>
                                     <td className="px-2 py-3 whitespace-nowrap">
-                                      <p className="text-muted-foreground text-xs">
+                                      <p className="text-muted-foreground font-mono text-xs">
                                         {student.matric_no}
                                       </p>
                                     </td>
@@ -926,7 +1071,7 @@ export default function CoursePage() {
                                     </td>
                                     <td className="px-2 py-3 whitespace-nowrap">
                                       <Button
-                                        variant="default"
+                                        variant="destructive"
                                         size="sm"
                                         onClick={() =>
                                           handleRemoveStudent(student._id)
@@ -975,14 +1120,14 @@ export default function CoursePage() {
                               </tr>
                             </thead>
                             <tbody>
-                              {students.map((student, index) => (
+                              {paginatedStudents.map((student, index) => (
                                 <tr
                                   key={student._id}
                                   className="border-border/50 hover:bg-muted/50 border-b transition-colors"
                                 >
                                   <td className="px-4 py-4">
                                     <span className="text-sm font-medium">
-                                      #{index + 1}
+                                      #{studentStartIndex + index + 1}
                                     </span>
                                   </td>
                                   <td className="px-4 py-4">
@@ -991,7 +1136,7 @@ export default function CoursePage() {
                                     </p>
                                   </td>
                                   <td className="px-4 py-4">
-                                    <p className="text-muted-foreground text-sm">
+                                    <p className="text-muted-foreground font-mono text-sm">
                                       {student.matric_no}
                                     </p>
                                   </td>
@@ -1002,7 +1147,7 @@ export default function CoursePage() {
                                   </td>
                                   <td className="px-4 py-4">
                                     <Button
-                                      variant="default"
+                                      variant="destructive"
                                       size="sm"
                                       onClick={() =>
                                         handleRemoveStudent(student._id)
@@ -1025,7 +1170,32 @@ export default function CoursePage() {
                           </table>
                         </div>
                       </div>
+
+                      {/* Student Pagination */}
+                      <Pagination
+                        currentPage={currentStudentPage}
+                        totalPages={totalStudentPages}
+                        onPageChange={setCurrentStudentPage}
+                        totalItems={filteredStudents.length}
+                        itemsPerPage={studentsPerPage}
+                        itemName="students"
+                      />
                     </>
+                  ) : studentSearchQuery ? (
+                    <div className="px-6 py-8 text-center">
+                      <p className="text-muted-foreground text-sm">
+                        No students found matching &quot;{studentSearchQuery}
+                        &quot;
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setStudentSearchQuery("")}
+                        className="mt-2"
+                      >
+                        Clear search
+                      </Button>
+                    </div>
                   ) : (
                     <div className="px-6 py-8 text-center">
                       <p className="text-muted-foreground text-sm">
@@ -1457,7 +1627,6 @@ export default function CoursePage() {
                               <Button
                                 onClick={() => handleDownloadReport("pdf")}
                                 size="sm"
-                                variant="outline"
                                 className="w-full"
                               >
                                 <FileText className="mr-2 h-4 w-4" />
@@ -1606,6 +1775,37 @@ export default function CoursePage() {
         onEmail={handleReportEmail}
         type={reportType}
         isLoading={isReportLoading}
+      />
+
+      {/* Update Course Modal */}
+      {currentCourse && (
+        <UpdateCourseModal
+          isOpen={showUpdateCourseModal}
+          onClose={() => setShowUpdateCourseModal(false)}
+          onUpdateCourse={handleUpdateCourse}
+          course={currentCourse}
+          isLoading={isLoading}
+        />
+      )}
+
+      {/* Student Removal Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showConfirmationModal}
+        onClose={() => {
+          setShowConfirmationModal(false);
+          setStudentToRemove(null);
+        }}
+        onConfirm={confirmRemoveStudent}
+        title="Remove Student"
+        description={
+          studentToRemove
+            ? `Are you sure you want to remove ${studentToRemove.name} from this course? This action cannot be undone.`
+            : "Are you sure you want to remove this student?"
+        }
+        confirmText="Remove Student"
+        cancelText="Cancel"
+        variant="destructive"
+        isLoading={removingStudentId === studentToRemove?.id}
       />
     </DashboardLayout>
   );

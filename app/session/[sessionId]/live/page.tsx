@@ -44,23 +44,41 @@ interface LiveSessionResponse {
     session_code: string;
     is_active: boolean;
     expires_at: string;
-    course_id?: string;
+    started_at: string;
   };
   recent_submissions: Array<{
-    student_id: string;
-    student_name: string;
-    student_email: string;
-    status: string;
-    timestamp: string;
-    location?: {
-      lat: number;
-      lng: number;
+    _id: string;
+    session_id: string;
+    course_id: string;
+    student_id: {
+      _id: string;
+      matric_no: string;
+      name: string;
     };
+    matric_no_submitted: string;
+    device_fingerprint: string;
+    lat: number;
+    lng: number;
+    accuracy: number;
+    status: string;
+    reason: string;
+    receipt_signature: string;
+    submitted_at: string;
+    createdAt: string;
+    updatedAt: string;
+    __v: number;
   }>;
   live_stats: {
     total_submissions: number;
     present_count: number;
+    rejected_count: number;
+    last_submission: string;
     last_updated: string;
+    time_window_minutes: number;
+  };
+  meta: {
+    showing_recent: boolean;
+    showing_all_recent: boolean;
   };
 }
 
@@ -223,9 +241,7 @@ export default function LiveSessionPage() {
               { label: "Courses", href: "/course" },
               {
                 label: "Course",
-                href: session_info.course_id
-                  ? `/course/${session_info.course_id}`
-                  : "/course",
+                href: `/course`,
               },
               {
                 label: `Session ${session_info.session_code}`,
@@ -237,9 +253,9 @@ export default function LiveSessionPage() {
         </div>
 
         {/* Header */}
-        <div className="animate-appear flex flex-col gap-4 opacity-0 delay-100 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="default" size="sm" onClick={() => router.back()}>
+        <div className="animate-appear flex flex-col gap-4 opacity-0 delay-100 lg:justify-between">
+          <div className="space-y-2">
+            <Button variant="outline" size="sm" onClick={() => router.back()}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Session
             </Button>
@@ -280,7 +296,7 @@ export default function LiveSessionPage() {
         </div>
 
         {/* Status Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           <Card className="animate-appear border-border/50 bg-card/50 hover:border-border hover:bg-card/80 backdrop-blur-sm transition-all duration-300">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -351,19 +367,44 @@ export default function LiveSessionPage() {
               </div>
             </CardContent>
           </Card>
+
+          <Card className="animate-appear border-border/50 bg-card/50 hover:border-border hover:bg-card/80 backdrop-blur-sm transition-all duration-300">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground text-sm font-medium">
+                    Rejected Count
+                  </p>
+                  <p className="text-2xl font-bold text-red-600">
+                    {live_stats.rejected_count}
+                  </p>
+                </div>
+                <XCircle className="h-8 w-8 text-red-500" />
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Recent Submissions */}
         <Card className="animate-appear border-border/50 bg-card/50 hover:border-border hover:bg-card/80 backdrop-blur-sm transition-all duration-300">
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
+            <CardTitle className="flex flex-col items-center justify-between sm:flex-row">
               <span className="flex items-center gap-2">
                 <Activity className="h-5 w-5" />
                 Recent Submissions
               </span>
-              <span className="text-muted-foreground text-sm font-normal">
-                Last updated: {formatDateTime(live_stats.last_updated)}
-              </span>
+              <div className="text-muted-foreground flex flex-col items-center gap-2 text-sm font-normal sm:flex-row">
+                <span>
+                  Last updated: {formatDateTime(live_stats.last_updated)}
+                </span>
+                {live_stats.last_submission && (
+                  <span>
+                    Last submission:{" "}
+                    {formatDateTime(live_stats.last_submission)}
+                  </span>
+                )}
+                <span>Window: {live_stats.time_window_minutes} minutes</span>
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -377,22 +418,35 @@ export default function LiveSessionPage() {
               </div>
             ) : (
               <div className="max-h-96 space-y-3 overflow-y-auto">
-                {recent_submissions.map((submission, index) => (
+                {recent_submissions.map((submission) => (
                   <div
-                    key={index}
+                    key={submission._id}
                     className="bg-muted/50 flex items-center justify-between rounded-lg p-4"
                   >
                     <div className="flex items-center gap-3">
                       {getStatusIcon(submission.status)}
                       <div>
-                        <p className="font-medium">{submission.student_name}</p>
-                        <p className="text-muted-foreground text-sm">
-                          {submission.student_email}
+                        <p className="font-medium">
+                          {submission.student_id.name}
                         </p>
-                        {submission.location && (
-                          <p className="text-muted-foreground text-xs">
-                            Location: {submission.location.lat.toFixed(6)},{" "}
-                            {submission.location.lng.toFixed(6)}
+                        <p className="text-muted-foreground text-sm">
+                          {submission.matric_no_submitted}
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                          Location: {submission.lat.toFixed(6)},{" "}
+                          {submission.lng.toFixed(6)}
+                          {submission.accuracy && ` (±${submission.accuracy}m)`}
+                        </p>
+                        {submission.device_fingerprint && (
+                          <p className="text-muted-foreground font-mono text-xs">
+                            Device:{" "}
+                            {submission.device_fingerprint.substring(0, 8)}...
+                          </p>
+                        )}
+                        {submission.receipt_signature && (
+                          <p className="text-muted-foreground font-mono text-xs">
+                            Receipt:{" "}
+                            {submission.receipt_signature.substring(0, 8)}...
                           </p>
                         )}
                       </div>
@@ -405,8 +459,13 @@ export default function LiveSessionPage() {
                         {submission.status}
                       </Badge>
                       <p className="text-muted-foreground mt-1 text-sm">
-                        {formatDateTime(submission.timestamp)}
+                        {formatDateTime(submission.submitted_at)}
                       </p>
+                      {submission.reason && (
+                        <p className="text-muted-foreground mt-1 text-xs italic">
+                          {submission.reason}
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))}

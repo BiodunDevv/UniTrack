@@ -1,6 +1,8 @@
 "use client";
 
-import { Menu } from "lucide-react";
+import { Separator } from "@radix-ui/react-dropdown-menu";
+import { Menu, Moon, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
 import { ReactNode, useEffect, useState } from "react";
 
 import { cn } from "@/lib/utils";
@@ -33,6 +35,7 @@ export default function NavBar({ className }: NavBarProps) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { isAuthenticated } = useAuthStore();
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -53,6 +56,9 @@ export default function NavBar({ className }: NavBarProps) {
     { text: "How it Works", href: "#workflow" },
     { text: "Technology", href: "#technology" },
     { text: "FAQ", href: "#faq" },
+    ...(isAuthenticated
+      ? []
+      : [{ text: "Submit Attendance", href: "/submit" }]),
   ];
 
   const actions: NavbarActionProps[] = [
@@ -105,6 +111,14 @@ export default function NavBar({ className }: NavBarProps) {
               >
                 FAQ
               </a>
+              {!isAuthenticated && (
+                <a
+                  href="/submit"
+                  className="text-primary hover:text-primary/80 text-sm font-medium transition-colors duration-200 hover:scale-105"
+                >
+                  Submit Attendance
+                </a>
+              )}
             </nav>
           </div>
 
@@ -183,13 +197,36 @@ export default function NavBar({ className }: NavBarProps) {
                   </div>
 
                   {/* Footer Section */}
-                  <div className="border-border/20 space-y-4 border-t pt-6">
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground text-sm font-medium">
-                        Theme Mode
-                      </span>
-                      <ModeToggle />
+                  <div className="border-border/20 space-y-6 border-t pt-6">
+                    {/* Theme Section */}
+                    <div className="space-y-3">
+                      <h3 className="text-foreground text-sm font-medium">
+                        Appearance
+                      </h3>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          variant={theme === "light" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setTheme("light")}
+                          className="flex h-auto flex-col gap-1 py-3 transition-all duration-200"
+                        >
+                          <Sun className="h-4 w-4" />
+                          <span className="text-xs">Light</span>
+                        </Button>
+                        <Button
+                          variant={theme === "dark" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setTheme("dark")}
+                          className="flex h-auto flex-col gap-1 py-3 transition-all duration-200"
+                        >
+                          <Moon className="h-4 w-4" />
+                          <span className="text-xs">Dark</span>
+                        </Button>
+                      </div>
                     </div>
+
+                    <Separator />
+
                     <Button
                       variant="default"
                       asChild
@@ -199,6 +236,14 @@ export default function NavBar({ className }: NavBarProps) {
                       <a href={isAuthenticated ? "/dashboard" : "/auth/signup"}>
                         {isAuthenticated ? "Dashboard" : "Get Started"}
                       </a>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      asChild
+                      className={`w-full bg-gradient-to-r py-3 text-base shadow-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-xl active:scale-95 ${isAuthenticated ? "hidden" : ""}`}
+                      onClick={handleLinkClick}
+                    >
+                      <a href="/auth/signin">Sign In</a>
                     </Button>
                   </div>
                 </nav>

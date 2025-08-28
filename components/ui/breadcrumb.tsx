@@ -20,7 +20,7 @@ interface BreadcrumbProps {
 export function Breadcrumb({ items, className }: BreadcrumbProps) {
   return (
     <nav
-      className={cn("flex items-center space-x-2 text-sm", className)}
+      className={cn("hidden items-center space-x-2 text-sm md:flex", className)}
       aria-label="Breadcrumb"
     >
       <Link

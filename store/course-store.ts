@@ -153,12 +153,13 @@ interface CourseState {
   createCourse: (courseData: {
     course_code: string;
     title: string;
+    level: number;
   }) => Promise<void>;
   getAllCourses: (page?: number, limit?: number) => Promise<void>;
   getCourse: (courseId: string) => Promise<void>;
   updateCourse: (
     courseId: string,
-    data: { title?: string; course_code?: string },
+    data: { title?: string; level?: number },
   ) => Promise<void>;
   deleteCourse: (courseId: string) => Promise<void>;
 
@@ -169,9 +170,20 @@ interface CourseState {
       matric_no: string;
       name: string;
       email: string;
-      phone: string;
+      level: number;
     },
   ) => Promise<void>;
+  addBulkStudentsToCourse: (
+    courseId: string,
+    studentsData: Array<{
+      course_code: string;
+      matric_no: string;
+      name: string;
+      email: string;
+      phone?: string;
+      level: number;
+    }>,
+  ) => Promise<ApiResponse>;
   getCourseStudents: (
     courseId: string,
     page?: number,
@@ -503,6 +515,31 @@ export const useCourseStore = create<CourseState>()(
           set({
             error:
               error instanceof Error ? error.message : "Failed to add student",
+            isLoading: false,
+          });
+          throw error;
+        }
+      },
+
+      addBulkStudentsToCourse: async (courseId, studentsData) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await apiCall(`/courses/${courseId}/students/bulk`, {
+            method: "POST",
+            body: JSON.stringify({ students: studentsData }),
+          });
+
+          if (isSuccessResponse(response) || response.message) {
+            set({ isLoading: false });
+            // Return the response for detailed handling in UI
+            return response;
+          } else {
+            throw new Error(response.message || "Failed to add students");
+          }
+        } catch (error) {
+          set({
+            error:
+              error instanceof Error ? error.message : "Failed to add students",
             isLoading: false,
           });
           throw error;

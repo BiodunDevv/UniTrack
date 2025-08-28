@@ -13,6 +13,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { AuthLayout } from "@/components/layouts/auth-layout";
 import UniTrack from "@/components/logos/unitrack";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -152,181 +153,137 @@ export default function ResetPasswordForm() {
   }
 
   return (
-    <div className="bg-background relative flex h-screen items-center justify-center overflow-hidden p-4">
-      {/* Background Glow Effect - positioned at bottom behind everything */}
-      <div className="absolute right-0 bottom-0 left-0 z-0">
-        <Glow
-          variant="top"
-          className="animate-appear-zoom opacity-0 delay-1000"
-        />
-      </div>
+    <AuthLayout
+      title="Set New Password"
+      subtitle={`Enter the 6-digit code sent to ${email} and your new password`}
+      badgeText="Reset Password"
+      showBackButton={true}
+      backHref="/auth/forgot-password"
+      backText="Back to forgot password"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* OTP Field */}
+        <div className="space-y-2">
+          <Label htmlFor="otp">Verification Code</Label>
+          <Input
+            id="otp"
+            name="otp"
+            type="text"
+            placeholder="Enter 6-digit code"
+            value={formData.otp}
+            onChange={handleInputChange}
+            maxLength={6}
+            required
+          />
+        </div>
 
-      {/* Content Container */}
-      <div className="relative z-20 w-full max-w-full">
-        <div className="mx-auto w-full max-w-md">
-          {/* Header */}
-          <div className="animate-in fade-in mb-8 text-center duration-500">
-            <Badge variant="outline" className="mb-4">
-              <UniTrack className="mr-2 size-4" />
-              <span className="text-muted-foreground">Reset Password</span>
-            </Badge>
-
-            <h1 className="from-foreground to-foreground/80 mb-2 bg-gradient-to-r bg-clip-text text-2xl font-bold text-transparent sm:text-3xl">
-              Set New Password
-            </h1>
-
-            <p className="text-muted-foreground text-sm">
-              Enter the 6-digit code sent to{" "}
-              <span className="text-foreground font-medium">{email}</span> and
-              your new password
-            </p>
-          </div>
-
-          {/* Form Card */}
-          <Card className="animate-in slide-in-from-bottom border-border/50 bg-background/80 p-6 backdrop-blur-sm delay-100 duration-600">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* OTP Field */}
-              <div className="space-y-2">
-                <Label htmlFor="otp">Verification Code</Label>
-                <Input
-                  id="otp"
-                  name="otp"
-                  type="text"
-                  placeholder="Enter 6-digit code"
-                  value={formData.otp}
-                  onChange={handleInputChange}
-                  maxLength={6}
-                  required
-                />
-              </div>
-
-              {/* Password Field */}
-              <div className="space-y-2">
-                <Label htmlFor="password">New Password</Label>
-                <div className="relative">
-                  <LockIcon className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-                  <Input
-                    id="password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Enter new password"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    className="pr-10 pl-10"
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute top-1/2 right-1 h-8 w-8 -translate-y-1/2 p-0"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOffIcon className="size-4" />
-                    ) : (
-                      <EyeIcon className="size-4" />
-                    )}
-                  </Button>
-                </div>
-                <p className="text-muted-foreground text-xs">
-                  Must be at least 8 characters with at least one number
-                </p>
-              </div>
-
-              {/* Confirm Password Field */}
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                <div className="relative">
-                  <LockIcon className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-                  <Input
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type={showConfirmPassword ? "text" : "password"}
-                    placeholder="Confirm new password"
-                    value={formData.confirmPassword}
-                    onChange={handleInputChange}
-                    className="pr-10 pl-10"
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute top-1/2 right-1 h-8 w-8 -translate-y-1/2 p-0"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  >
-                    {showConfirmPassword ? (
-                      <EyeOffIcon className="size-4" />
-                    ) : (
-                      <EyeIcon className="size-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              {/* Password Requirements */}
-              <div className="border-border bg-muted/50 rounded-lg border p-3">
-                <p className="text-muted-foreground mb-2 text-xs font-medium">
-                  Password must contain:
-                </p>
-                <ul className="text-muted-foreground space-y-1 text-xs">
-                  <li className="flex items-center gap-2">
-                    <div
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        formData.password.length >= 8
-                          ? "bg-green-500"
-                          : "bg-gray-300"
-                      }`}
-                    />
-                    At least 8 characters
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <div
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        /[0-9]/.test(formData.password)
-                          ? "bg-green-500"
-                          : "bg-gray-300"
-                      }`}
-                    />
-                    At least one number
-                  </li>
-                </ul>
-              </div>
-
-              {/* Submit Button */}
-              <Button
-                type="submit"
-                className="w-full"
-                size="lg"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <LoaderIcon className="mr-2 size-4 animate-spin" />
-                    Resetting Password...
-                  </>
-                ) : (
-                  <>
-                    Reset Password
-                    <ArrowRight className="ml-2 size-4" />
-                  </>
-                )}
-              </Button>
-            </form>
-          </Card>
-
-          {/* Additional Links */}
-          <div className="animate-in fade-in mt-6 text-center delay-300 duration-500">
-            <Link
-              href="/auth/signin"
-              className="text-muted-foreground hover:text-foreground text-sm transition-colors hover:underline"
+        {/* Password Field */}
+        <div className="space-y-2">
+          <Label htmlFor="password">New Password</Label>
+          <div className="relative">
+            <LockIcon className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+            <Input
+              id="password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              placeholder="Enter new password"
+              value={formData.password}
+              onChange={handleInputChange}
+              className="pr-10 pl-10"
+              required
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="absolute top-1/2 right-1 h-8 w-8 -translate-y-1/2 p-0"
+              onClick={() => setShowPassword(!showPassword)}
             >
-              ← Back to sign in
-            </Link>
+              {showPassword ? (
+                <EyeOffIcon className="size-4" />
+              ) : (
+                <EyeIcon className="size-4" />
+              )}
+            </Button>
+          </div>
+          <p className="text-muted-foreground text-xs">
+            Must be at least 8 characters with at least one number
+          </p>
+        </div>
+
+        {/* Confirm Password Field */}
+        <div className="space-y-2">
+          <Label htmlFor="confirmPassword">Confirm New Password</Label>
+          <div className="relative">
+            <LockIcon className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+            <Input
+              id="confirmPassword"
+              name="confirmPassword"
+              type={showConfirmPassword ? "text" : "password"}
+              placeholder="Confirm new password"
+              value={formData.confirmPassword}
+              onChange={handleInputChange}
+              className="pr-10 pl-10"
+              required
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="absolute top-1/2 right-1 h-8 w-8 -translate-y-1/2 p-0"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+            >
+              {showConfirmPassword ? (
+                <EyeOffIcon className="size-4" />
+              ) : (
+                <EyeIcon className="size-4" />
+              )}
+            </Button>
           </div>
         </div>
-      </div>
-    </div>
+
+        {/* Password Requirements */}
+        <div className="border-border bg-muted/50 rounded-lg border p-3">
+          <p className="text-muted-foreground mb-2 text-xs font-medium">
+            Password must contain:
+          </p>
+          <ul className="text-muted-foreground space-y-1 text-xs">
+            <li className="flex items-center gap-2">
+              <div
+                className={`h-1.5 w-1.5 rounded-full ${
+                  formData.password.length >= 8 ? "bg-green-500" : "bg-gray-300"
+                }`}
+              />
+              At least 8 characters
+            </li>
+            <li className="flex items-center gap-2">
+              <div
+                className={`h-1.5 w-1.5 rounded-full ${
+                  /[0-9]/.test(formData.password)
+                    ? "bg-green-500"
+                    : "bg-gray-300"
+                }`}
+              />
+              At least one number
+            </li>
+          </ul>
+        </div>
+
+        {/* Submit Button */}
+        <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
+          {isLoading ? (
+            <>
+              <LoaderIcon className="mr-2 size-4 animate-spin" />
+              Resetting Password...
+            </>
+          ) : (
+            <>
+              Reset Password
+              <ArrowRight className="ml-2 size-4" />
+            </>
+          )}
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }

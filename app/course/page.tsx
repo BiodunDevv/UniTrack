@@ -3,9 +3,8 @@
 import {
   BookOpen,
   Clock,
-  Download,
+  Edit,
   Eye,
-  Filter,
   GraduationCap,
   Plus,
   Search,
@@ -19,6 +18,7 @@ import { toast } from "sonner";
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { Badge } from "@/components/ui/badge";
+import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -28,6 +28,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Pagination } from "@/components/ui/pagination";
+import { UpdateCourseModal } from "@/components/ui/update-course-modal";
 import { useAuthStore } from "@/store/auth-store";
 import { useCourseStore } from "@/store/course-store";
 
@@ -37,7 +39,9 @@ export default function CoursesPage() {
     courses,
     isLoading,
     error,
+    pagination,
     getAllCourses,
+    updateCourse,
     deleteCourse,
     setCurrentCourse,
     clearError,
@@ -45,14 +49,18 @@ export default function CoursesPage() {
 
   const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [courseToUpdate, setCourseToUpdate] = useState<
+    (typeof courses)[0] | null
+  >(null);
 
-
-  // Fetch courses on component mount
+  // Fetch courses on component mount and when page changes
   React.useEffect(() => {
     if (isAuthenticated && !authLoading) {
-      getAllCourses();
+      getAllCourses(currentPage, 8);
     }
-  }, [getAllCourses, isAuthenticated, authLoading]);
+  }, [getAllCourses, isAuthenticated, authLoading, currentPage]);
 
   React.useEffect(() => {
     if (error) {
@@ -61,13 +69,24 @@ export default function CoursesPage() {
     }
   }, [error, clearError]);
 
-  // Filter courses based on search query
-  const filteredCourses = courses.filter(
-    (course) =>
-      course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      course.course_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      course.level.toString().includes(searchQuery.toLowerCase()),
-  );
+  // Reset to first page when search query changes
+  React.useEffect(() => {
+    if (searchQuery) {
+      setCurrentPage(1);
+    }
+  }, [searchQuery]);
+
+  // Filter courses based on search query (client-side filtering for search)
+  const filteredCourses = searchQuery
+    ? courses.filter(
+        (course) =>
+          course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          course.course_code
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase()) ||
+          course.level.toString().includes(searchQuery.toLowerCase()),
+      )
+    : courses;
 
   const handleCourseClick = (course: (typeof courses)[0]) => {
     setCurrentCourse(course);
@@ -87,6 +106,24 @@ export default function CoursesPage() {
         toast.error("Failed to delete course");
         console.error("Failed to delete course:", error);
       }
+    }
+  };
+
+  const handleEditCourse = (course: (typeof courses)[0]) => {
+    setCourseToUpdate(course);
+    setShowUpdateModal(true);
+  };
+
+  const handleUpdateCourse = async (
+    courseId: string,
+    data: { title?: string; level?: number },
+  ) => {
+    try {
+      await updateCourse(courseId, data);
+      // Refresh courses list after update
+      getAllCourses();
+    } catch (error) {
+      throw error; // Let the modal handle the error
     }
   };
 
@@ -113,6 +150,11 @@ export default function CoursesPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6 p-4 lg:p-6">
+        {/* Breadcrumb */}
+        <div className="animate-appear opacity-0">
+          <Breadcrumb items={[{ label: "Courses", current: true }]} />
+        </div>
+
         {/* Header Section */}
         <div className="animate-appear flex flex-col gap-4 opacity-0 delay-100 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-2">
@@ -143,24 +185,6 @@ export default function CoursesPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="border-border/50 bg-card/50 hover:border-border focus:border-primary pl-9 backdrop-blur-sm transition-all duration-300"
             />
-          </div>
-          <div className="flex w-full items-center gap-2 sm:w-auto">
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-border/50 bg-card/50 hover:bg-card/80 hover:border-primary/20 backdrop-blur-sm transition-all duration-300 hover:scale-105"
-            >
-              <Filter className="mr-2 h-4 w-4" />
-              Filter
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-border/50 bg-card/50 hover:bg-card/80 hover:border-primary/20 backdrop-blur-sm transition-all duration-300 hover:scale-105"
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Export
-            </Button>
           </div>
         </div>
 
@@ -227,14 +251,12 @@ export default function CoursesPage() {
         {/* Courses Grid */}
         <div className="animate-appear opacity-0 delay-500">
           {isLoading ? (
-            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-              <CardContent className="flex items-center justify-center py-12">
-                <div className="flex items-center gap-2">
-                  <div className="border-primary h-6 w-6 animate-spin rounded-full border-b-2"></div>
-                  <p className="text-muted-foreground">Loading courses...</p>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="flex flex-1 items-center justify-center">
+              <div className="text-center">
+                <div className="border-primary mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-b-2"></div>
+                <p className="text-muted-foreground">Loading courses...</p>
+              </div>
+            </div>
           ) : filteredCourses.length === 0 ? (
             <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
               <CardContent className="flex flex-col items-center justify-center py-12">
@@ -297,7 +319,7 @@ export default function CoursesPage() {
                   </CardHeader>
                   <CardContent className="pt-0">
                     <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="grid grid-cols-1 gap-2 text-sm">
                         <div className="flex items-center justify-between">
                           <span className="text-muted-foreground text-xs">
                             Students
@@ -330,6 +352,17 @@ export default function CoursesPage() {
                           View
                         </Button>
                         <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditCourse(course);
+                          }}
+                          className="border-border/50 bg-background/50 backdrop-blur-sm transition-all duration-300 hover:bg-orange-600 hover:text-white"
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button
                           variant="default"
                           size="sm"
                           onClick={(e) => {
@@ -347,8 +380,36 @@ export default function CoursesPage() {
               ))}
             </div>
           )}
+
+          {/* Pagination Controls */}
+          {!searchQuery && pagination && pagination.totalPages > 1 && (
+            <div className="mt-8 flex justify-center">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={pagination.totalPages}
+                onPageChange={setCurrentPage}
+                totalItems={pagination.totalCourses || 0}
+                itemsPerPage={8}
+                itemName="courses"
+              />
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Update Course Modal */}
+      {courseToUpdate && (
+        <UpdateCourseModal
+          isOpen={showUpdateModal}
+          onClose={() => {
+            setShowUpdateModal(false);
+            setCourseToUpdate(null);
+          }}
+          onUpdateCourse={handleUpdateCourse}
+          course={courseToUpdate}
+          isLoading={isLoading}
+        />
+      )}
     </DashboardLayout>
   );
 }

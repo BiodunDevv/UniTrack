@@ -2,37 +2,33 @@
 
 import {
   Bell,
-  ChevronDown,
+  ChevronRight,
   CreditCard,
   HelpCircle,
   LogOut,
-  PanelRight,
-  Search,
-  Settings,
+  Moon,
+  PanelRightOpen,
+  Sun,
   User,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
 import { ReactNode, useState } from "react";
 import { toast } from "sonner";
 
-import { AuthGuard } from "@/components/auth-guard";
-import { CustomSidebar } from "@/components/custom-sidebar";
+import { AuthGuard } from "@/components/AuthGuard";
+import { CustomSidebar } from "@/components/SideBar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import Glow from "@/components/ui/glow";
-import { Input } from "@/components/ui/input";
-import { ModeToggle } from "@/components/ui/mode-toggle";
 import { Separator } from "@/components/ui/separator";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useAuthStore } from "@/store/auth-store";
+
+import UniTrack from "../logos/unitrack";
+import { ModeToggle } from "../ui/mode-toggle";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -44,12 +40,23 @@ export function DashboardLayout({
   requireAuth = true,
 }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const { user, logout } = useAuthStore();
+  const { theme, setTheme } = useTheme();
   const router = useRouter();
 
   const handleLogout = async () => {
+    // Close the settings modal first
+    setSettingsOpen(false);
+
     try {
+      // Show loading toast
+      const loadingToast = toast.loading("Signing out...");
+
       await logout();
+
+      // Dismiss loading toast and show success
+      toast.dismiss(loadingToast);
       toast.success("Logged out successfully");
       router.push("/auth/signin");
     } catch {
@@ -85,113 +92,185 @@ export function DashboardLayout({
       {/* Main Content */}
       <div className="w-full">
         {/* Header */}
-        <header className="border-border/50 bg-card/60 sticky top-0 z-30 border-b backdrop-blur-xl">
-          <div className="flex h-16 items-center justify-between px-4 lg:px-6">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSidebarOpen(true)}
-                className="hover:bg-accent/50"
-              >
-                <PanelRight className="h-5 w-5" />
-              </Button>
-              <Separator orientation="vertical" className="bg-border/50 h-6" />
-              <div className="flex items-center gap-2">
-                <h1 className="from-foreground to-muted-foreground bg-gradient-to-r bg-clip-text text-lg font-semibold text-transparent">
-                  UniTrack
-                </h1>
-                <Badge
-                  variant="outline"
-                  className="border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 text-xs transition-all duration-300"
+        <header className="sticky top-0 z-30 p-2 sm:p-4">
+          <div className="mx-auto max-w-full">
+            <div className="bg-background/40 border-border/50 flex h-14 items-center justify-between rounded-2xl border px-3 shadow-lg shadow-black/5 backdrop-blur-2xl transition-all duration-300 ease-out sm:h-16 sm:px-4 lg:px-6">
+              <div className="flex items-center gap-2 sm:gap-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSidebarOpen(true)}
+                  className="hover:bg-accent/50 p-2 transition-transform duration-200 hover:scale-105"
                 >
-                  {user?.role === "admin" ? "Admin" : "Lecturer"}
-                </Badge>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className="relative hidden md:block">
-                <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-                <Input
-                  placeholder="Search students, records..."
-                  className="border-border/50 bg-background/50 focus:bg-background/80 w-64 pl-9 transition-all duration-300"
+                  <PanelRightOpen className="h-4 w-4 sm:h-5 sm:w-5" />
+                </Button>
+                <Separator
+                  orientation="vertical"
+                  className="bg-border/50 hidden h-6 sm:block"
                 />
+                <div className="flex items-center gap-1 sm:gap-2">
+                  <Link
+                    href="/"
+                    className="hover:text-primary flex items-center gap-1 text-lg font-bold transition-colors duration-200 sm:gap-2 sm:text-xl"
+                  >
+                    <UniTrack />
+                    <span>UniTrack</span>
+                  </Link>
+                  <Badge
+                    variant="outline"
+                    className="border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 hidden text-xs transition-all duration-300 hover:scale-105 sm:inline-flex"
+                  >
+                    {user?.role === "admin" ? "Admin" : "Lecturer"}
+                  </Badge>
+                </div>
               </div>
-              <ModeToggle />
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="hover:bg-accent/50 flex items-center gap-2 rounded-full p-1 transition-all duration-200"
-                  >
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="bg-primary/10 text-primary">
-                        {user?.name
-                          ?.split(" ")
-                          .map((n) => n[0])
-                          .join("") || "U"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <ChevronDown className="text-muted-foreground h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  className="border-border/50 bg-card/95 w-56 backdrop-blur-xl"
+
+              <div className="flex items-center gap-2 sm:gap-3">
+                <ModeToggle />
+                {/* User Avatar */}
+                <Button
+                  variant="ghost"
+                  onClick={() => setSettingsOpen(true)}
+                  className="hover:bg-accent/50 flex items-center gap-1 rounded-full p-1 transition-all duration-200 hover:scale-105 sm:gap-2"
                 >
-                  <DropdownMenuLabel className="flex items-center gap-2">
-                    <Avatar className="h-6 w-6">
-                      <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                        {user?.name
-                          ?.split(" ")
-                          .map((n) => n[0])
-                          .join("") || "U"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium">
-                        {user?.name || "User"}
-                      </span>
-                      <span className="text-muted-foreground text-xs">
-                        {user?.email || "user@example.com"}
-                      </span>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className="hover:bg-accent/50 cursor-pointer transition-colors duration-200">
-                    <User className="mr-2 h-4 w-4" />
-                    <span>Profile</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="hover:bg-accent/50 cursor-pointer transition-colors duration-200">
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="hover:bg-accent/50 cursor-pointer transition-colors duration-200">
-                    <CreditCard className="mr-2 h-4 w-4" />
-                    <span>Billing</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="hover:bg-accent/50 cursor-pointer transition-colors duration-200">
-                    <Bell className="mr-2 h-4 w-4" />
-                    <span>Notifications</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="hover:bg-accent/50 cursor-pointer transition-colors duration-200">
-                    <HelpCircle className="mr-2 h-4 w-4" />
-                    <span>Help & Support</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={handleLogout}
-                    className="text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer transition-colors duration-200"
-                  >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                  <Avatar className="h-7 w-7 sm:h-8 sm:w-8">
+                    <AvatarFallback className="bg-primary/10 text-primary text-xs sm:text-sm">
+                      {user?.name
+                        ?.split(" ")
+                        .map((n) => n[0])
+                        .join("") || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <ChevronRight className="text-muted-foreground h-3 w-3" />
+                </Button>
+              </div>
             </div>
           </div>
         </header>
+
+        {/* Settings Sidebar */}
+        <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
+          <SheetContent
+            side="right"
+            className="border-border/50 bg-background/95 w-[85vw] max-w-sm p-0 backdrop-blur-xl"
+          >
+            <SheetTitle className="sr-only">Settings Menu</SheetTitle>
+            <div className="flex h-full flex-col">
+              {/* Header */}
+              <div className="border-border/20 flex items-center justify-between border-b p-6">
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-10 w-10">
+                    <AvatarFallback className="bg-primary/10 text-primary">
+                      {user?.name
+                        ?.split(" ")
+                        .map((n) => n[0])
+                        .join("") || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold">
+                      {user?.name || "User"}
+                    </span>
+                    <span className="text-muted-foreground text-xs">
+                      {user?.email || "user@example.com"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="space-y-6">
+                  {/* Theme Section */}
+                  <div className="space-y-3">
+                    <h3 className="text-foreground text-sm font-medium">
+                      Appearance
+                    </h3>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant={theme === "light" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setTheme("light")}
+                        className="flex h-auto flex-col gap-1 py-3 transition-all duration-200"
+                      >
+                        <Sun className="h-4 w-4" />
+                        <span className="text-xs">Light</span>
+                      </Button>
+                      <Button
+                        variant={theme === "dark" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setTheme("dark")}
+                        className="flex h-auto flex-col gap-1 py-3 transition-all duration-200"
+                      >
+                        <Moon className="h-4 w-4" />
+                        <span className="text-xs">Dark</span>
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* User Role Badge */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Role</span>
+                    <Badge
+                      variant="outline"
+                      className="border-primary/20 bg-primary/5 text-primary"
+                    >
+                      {user?.role === "admin" ? "Admin" : "Lecturer"}
+                    </Badge>
+                  </div>
+
+                  <Separator />
+
+                  {/* Menu Items */}
+                  <div className="space-y-1">
+                    <Button
+                      variant="ghost"
+                      className="hover:bg-accent/50 w-full justify-start transition-colors duration-200"
+                    >
+                      <User className="mr-3 h-4 w-4" />
+                      Profile Settings
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="hover:bg-accent/50 w-full justify-start transition-colors duration-200"
+                    >
+                      <Bell className="mr-3 h-4 w-4" />
+                      Notifications
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="hover:bg-accent/50 w-full justify-start transition-colors duration-200"
+                    >
+                      <CreditCard className="mr-3 h-4 w-4" />
+                      Billing
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="hover:bg-accent/50 w-full justify-start transition-colors duration-200"
+                    >
+                      <HelpCircle className="mr-3 h-4 w-4" />
+                      Help & Support
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="border-border/20 border-t p-6">
+                <Button
+                  onClick={handleLogout}
+                  variant="destructive"
+                  className="w-full transition-all duration-200 hover:scale-[1.02]"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sign Out
+                </Button>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
 
         {/* Page Content */}
         <main className="relative z-10">{children}</main>

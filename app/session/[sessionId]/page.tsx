@@ -265,8 +265,8 @@ export default function SessionDetailPage() {
 
         {/* Header */}
         <div className="animate-appear flex flex-col gap-4 opacity-0 delay-100 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="default" size="sm" onClick={() => router.back()}>
+          <div className="space-y-4">
+            <Button variant="outline" size="sm" onClick={() => router.back()}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back
             </Button>

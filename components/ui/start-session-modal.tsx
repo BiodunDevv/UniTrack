@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, Loader2,MapPin, Users } from "lucide-react";
+import { Clock, Loader2, MapPin, Users } from "lucide-react";
 import * as React from "react";
 
 import { Button } from "./button";
@@ -99,7 +99,7 @@ export function StartSessionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="w-[95vw] max-w-md sm:w-full">
         <DialogHeader>
           <DialogTitle>Start Attendance Session</DialogTitle>
         </DialogHeader>
@@ -203,14 +203,18 @@ export function StartSessionModal({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-2 pt-4">
-            <Button variant="outline" onClick={onClose} className="flex-1">
+          <div className="flex flex-col gap-3 pt-4 sm:flex-row sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={onClose}
+              className="w-full sm:flex-1"
+            >
               Cancel
             </Button>
             <Button
               onClick={handleStartSession}
               disabled={!location || isLoading}
-              className="flex-1"
+              className="w-full sm:flex-1"
             >
               {isLoading ? (
                 <>
