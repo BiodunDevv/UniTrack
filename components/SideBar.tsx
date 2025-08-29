@@ -3,6 +3,7 @@
 import {
   BarChart3,
   BookOpen,
+  Calendar,
   GraduationCap,
   PanelRightClose,
   Plus,
@@ -122,6 +123,17 @@ export function CustomSidebar({ onClose }: CustomSidebarProps) {
           {
             title: "Create Course",
             url: "/course/create",
+          },
+        ],
+      },
+      {
+        title: "Sessions",
+        url: "/session",
+        icon: Calendar,
+        items: [
+          {
+            title: "All Sessions",
+            url: "/session",
           },
         ],
       },

@@ -35,6 +35,15 @@ interface Course {
   createdAt: string;
   updatedAt: string;
   __v: number;
+  // New active session fields
+  active_sessions_count?: number;
+  has_active_session?: boolean;
+  active_sessions?: Array<{
+    _id: string;
+    session_code: string;
+    start_ts: string;
+    expiry_ts: string;
+  }>;
 }
 
 interface Student {
@@ -138,6 +147,7 @@ interface ApiResponse<T = any> {
 interface CourseState {
   // State
   courses: Course[];
+  allCourses: Course[]; // Store all courses for client-side pagination
   currentCourse: Course | null;
   students: Student[];
   sessions: Session[];
@@ -148,6 +158,10 @@ interface CourseState {
   isEmailingCSV: boolean;
   isEmailingPDF: boolean;
   error: string | null;
+  currentPage: number;
+  coursesPerPage: number;
+  totalStudents: number; // Total students across all courses
+  totalActiveSessions: number; // Total active sessions across all courses
 
   // Course Management Actions
   createCourse: (courseData: {
@@ -155,13 +169,18 @@ interface CourseState {
     title: string;
     level: number;
   }) => Promise<void>;
-  getAllCourses: (page?: number, limit?: number) => Promise<void>;
+  getAllCourses: () => Promise<void>; // Updated to remove pagination params
   getCourse: (courseId: string) => Promise<void>;
   updateCourse: (
     courseId: string,
     data: { title?: string; level?: number },
   ) => Promise<void>;
   deleteCourse: (courseId: string) => Promise<void>;
+
+  // Client-side pagination actions
+  setCurrentPage: (page: number) => void;
+  getDisplayedCourses: () => Course[];
+  getTotalPages: () => number;
 
   // Student Management Actions
   addStudentToCourse: (
@@ -307,6 +326,7 @@ export const useCourseStore = create<CourseState>()(
     (set, get) => ({
       // Initial State
       courses: [],
+      allCourses: [],
       currentCourse: null,
       students: [],
       sessions: [],
@@ -317,6 +337,10 @@ export const useCourseStore = create<CourseState>()(
       isEmailingCSV: false,
       isEmailingPDF: false,
       error: null,
+      currentPage: 1,
+      coursesPerPage: 8,
+      totalStudents: 0,
+      totalActiveSessions: 0,
 
       // Course Management Actions
       createCourse: async (courseData) => {
@@ -346,19 +370,45 @@ export const useCourseStore = create<CourseState>()(
         }
       },
 
-      getAllCourses: async (page = 1, limit = 8) => {
+      getAllCourses: async () => {
         set({ isLoading: true, error: null });
         try {
-          const response = await apiCall(
-            `/courses?page=${page}&limit=${limit}`,
-          );
+          // Fetch all courses with a large limit to get all courses
+          const response = await apiCall("/courses?limit=1000");
 
-          console.log("Fetched courses:", response.courses);
+          console.log("Fetched all courses:", response.courses);
 
           if (isSuccessResponse(response)) {
+            const allCourses = response.courses || [];
+            const { currentPage, coursesPerPage } = get();
+
+            // Calculate total students across all courses
+            const totalStudents = allCourses.reduce((sum, course) => {
+              return sum + (course.student_count || 0);
+            }, 0);
+
+            // Calculate total active sessions across all courses
+            const totalActiveSessions = allCourses.reduce((sum, course) => {
+              return sum + (course.active_sessions_count || 0);
+            }, 0);
+
+            // Calculate displayed courses for current page
+            const startIndex = (currentPage - 1) * coursesPerPage;
+            const endIndex = startIndex + coursesPerPage;
+            const displayedCourses = allCourses.slice(startIndex, endIndex);
+
             set({
-              courses: response.courses || [],
-              pagination: response.pagination || null,
+              allCourses,
+              courses: displayedCourses,
+              totalStudents,
+              totalActiveSessions,
+              pagination: {
+                currentPage,
+                totalPages: Math.ceil(allCourses.length / coursesPerPage),
+                totalCourses: allCourses.length,
+                hasNext: endIndex < allCourses.length,
+                hasPrev: currentPage > 1,
+              },
               isLoading: false,
             });
           } else {
@@ -951,13 +1001,61 @@ export const useCourseStore = create<CourseState>()(
       setLoading: (loading: boolean) => set({ isLoading: loading }),
       setCurrentCourse: (course: Course | null) =>
         set({ currentCourse: course }),
+
+      // Client-side pagination methods
+      setCurrentPage: (page: number) => {
+        const { allCourses, coursesPerPage } = get();
+        const startIndex = (page - 1) * coursesPerPage;
+        const endIndex = startIndex + coursesPerPage;
+        const displayedCourses = allCourses.slice(startIndex, endIndex);
+
+        // Calculate total students across all courses
+        const totalStudents = allCourses.reduce((sum, course) => {
+          return sum + (course.student_count || 0);
+        }, 0);
+
+        // Calculate total active sessions across all courses
+        const totalActiveSessions = allCourses.reduce((sum, course) => {
+          return sum + (course.active_sessions_count || 0);
+        }, 0);
+
+        set({
+          currentPage: page,
+          courses: displayedCourses,
+          totalStudents,
+          totalActiveSessions,
+          pagination: {
+            currentPage: page,
+            totalPages: Math.ceil(allCourses.length / coursesPerPage),
+            totalCourses: allCourses.length,
+            hasNext: endIndex < allCourses.length,
+            hasPrev: page > 1,
+          },
+        });
+      },
+      getDisplayedCourses: () => {
+        const { allCourses, currentPage, coursesPerPage } = get();
+        const startIndex = (currentPage - 1) * coursesPerPage;
+        const endIndex = startIndex + coursesPerPage;
+        return allCourses.slice(startIndex, endIndex);
+      },
+
+      getTotalPages: () => {
+        const { allCourses, coursesPerPage } = get();
+        return Math.ceil(allCourses.length / coursesPerPage);
+      },
     }),
     {
       name: "course-storage",
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         courses: state.courses,
+        allCourses: state.allCourses,
         currentCourse: state.currentCourse,
+        currentPage: state.currentPage,
+        coursesPerPage: state.coursesPerPage,
+        totalStudents: state.totalStudents,
+        totalActiveSessions: state.totalActiveSessions,
       }),
     },
   ),
