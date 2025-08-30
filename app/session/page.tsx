@@ -28,6 +28,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { CourseSelectionModal } from "@/components/ui/course-selection-modal";
 import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
 import {
@@ -56,13 +57,15 @@ export default function SessionsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [showCourseSelectionModal, setShowCourseSelectionModal] =
+    useState(false);
 
   // Fetch sessions on component mount
   React.useEffect(() => {
     if (isAuthenticated && !authLoading) {
       getAllSessions(
         currentPage,
-        20,
+        18,
         statusFilter === "all" ? undefined : statusFilter,
       );
     }
@@ -107,6 +110,19 @@ export default function SessionsPage() {
     setCurrentPage(1);
   };
 
+  // Handle session started callback
+  const handleSessionStarted = (sessionId: string, courseId: string) => {
+    // Refresh sessions list
+    getAllSessions(
+      currentPage,
+      20,
+      statusFilter === "all" ? undefined : statusFilter,
+    );
+
+    // Navigate to the course page to see the active session
+    router.push(`/course/${courseId}`);
+  };
+
   // Get time-based greeting
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -123,6 +139,7 @@ export default function SessionsPage() {
       300: "3rd Year",
       400: "4th Year",
       500: "5th Year",
+      600: "6th Year",
     };
     return levelMap[level] || `Level ${level}`;
   };
@@ -177,6 +194,15 @@ export default function SessionsPage() {
                   </span>
                 )}
             </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setShowCourseSelectionModal(true)}
+              className="bg-green-600 transition-all duration-300 hover:scale-105 hover:bg-green-700 hover:shadow-lg hover:shadow-green-600/20"
+            >
+              <Clock className="mr-2 h-4 w-4" />
+              Start Session
+            </Button>
           </div>
         </div>
 
@@ -466,6 +492,13 @@ export default function SessionsPage() {
             )}
         </div>
       </div>
+
+      {/* Course Selection Modal */}
+      <CourseSelectionModal
+        isOpen={showCourseSelectionModal}
+        onClose={() => setShowCourseSelectionModal(false)}
+        onSessionStarted={handleSessionStarted}
+      />
     </DashboardLayout>
   );
 }

@@ -1,9 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  "https://unitrack-backend-hd9s.onrender.com/api";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "localhost:3000";
 
 // Function to get auth token from localStorage (where zustand stores it)
 const getAuthToken = (): string | null => {
@@ -105,6 +103,37 @@ interface StudentsData {
   list: Student[];
 }
 
+interface CopyStudentsResponse {
+  message: string;
+  addedStudents: Array<{
+    _id: string;
+    course_id: string;
+    student_id: {
+      _id: string;
+      matric_no: string;
+      name: string;
+      email: string;
+      phone?: string;
+      level: number;
+    };
+    added_by: string;
+    added_at: string;
+    createdAt: string;
+    updatedAt: string;
+    __v: number;
+  }>;
+  skippedStudents: Array<{
+    matric_no: string;
+    name: string;
+    reason: string;
+  }>;
+  summary: {
+    total_processed: number;
+    added: number;
+    skipped: number;
+  };
+}
+
 interface SessionsData {
   total: number;
   active: number;
@@ -203,6 +232,10 @@ interface CourseState {
       level: number;
     }>,
   ) => Promise<ApiResponse>;
+  copyStudentsFromCourse: (
+    sourceCourseId: string,
+    targetCourseId: string,
+  ) => Promise<CopyStudentsResponse>;
   getCourseStudents: (
     courseId: string,
     page?: number,
@@ -376,8 +409,6 @@ export const useCourseStore = create<CourseState>()(
           // Fetch all courses with a large limit to get all courses
           const response = await apiCall("/courses?limit=1000");
 
-          console.log("Fetched all courses:", response.courses);
-
           if (isSuccessResponse(response)) {
             const allCourses = response.courses || [];
             const { currentPage, coursesPerPage } = get();
@@ -431,8 +462,6 @@ export const useCourseStore = create<CourseState>()(
         try {
           const response = await apiCall(`/courses/${courseId}`);
 
-          console.log("getCourse response:", response);
-
           if (isSuccessResponse(response)) {
             // Handle the comprehensive data structure
             const { course, students, sessions, statistics } = response;
@@ -482,7 +511,6 @@ export const useCourseStore = create<CourseState>()(
             throw new Error(response.message || "Failed to fetch course");
           }
         } catch (error) {
-          console.error("getCourse error:", error);
           set({
             error:
               error instanceof Error ? error.message : "Failed to fetch course",
@@ -590,6 +618,94 @@ export const useCourseStore = create<CourseState>()(
           set({
             error:
               error instanceof Error ? error.message : "Failed to add students",
+            isLoading: false,
+          });
+          throw error;
+        }
+      },
+
+      copyStudentsFromCourse: async (sourceCourseId, targetCourseId) => {
+        set({ isLoading: true, error: null });
+        try {
+          const token = getAuthToken();
+
+          // Use direct fetch instead of apiCall to handle 400 status codes specially
+          const response = await fetch(
+            `${API_BASE_URL}/courses/${targetCourseId}/copy-students/${sourceCourseId}`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                ...(token && { Authorization: `Bearer ${token}` }),
+              },
+            },
+          );
+
+          const responseData = await response.json();
+
+          // Handle 400 status with "No students found to copy" as a special case
+          if (!response.ok) {
+            if (
+              response.status === 400 &&
+              responseData.error === "No students found to copy"
+            ) {
+              set({ isLoading: false });
+              return {
+                message: "No students to copy from this course",
+                summary: {
+                  total_processed: 0,
+                  added: 0,
+                  updated: 0,
+                  skipped: 0,
+                  errors: 0,
+                },
+                addedStudents: [],
+                skippedStudents: [],
+                updatedStudents: [],
+                errorStudents: [],
+              } as CopyStudentsResponse;
+            }
+
+            // For other errors, throw as usual
+            throw new Error(
+              responseData.message ||
+                responseData.error ||
+                `HTTP error! status: ${response.status}`,
+            );
+          }
+
+          set({ isLoading: false });
+          return responseData as CopyStudentsResponse;
+        } catch (error) {
+
+          // If it's our custom "no students" case, don't set it as an error
+          if (
+            error instanceof Error &&
+            error.message === "No students found to copy"
+          ) {
+            set({ isLoading: false });
+            // Return a mock successful response with zero results
+            return {
+              message: "No students to copy from this course",
+              summary: {
+                total_processed: 0,
+                added: 0,
+                updated: 0,
+                skipped: 0,
+                errors: 0,
+              },
+              addedStudents: [],
+              skippedStudents: [],
+              updatedStudents: [],
+              errorStudents: [],
+            } as CopyStudentsResponse;
+          }
+
+          set({
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to copy students",
             isLoading: false,
           });
           throw error;
@@ -839,8 +955,6 @@ export const useCourseStore = create<CourseState>()(
             `/attendance/course/${courseId}/stats`,
           );
 
-          console.log("getCourseStats response:", response);
-
           if (isSuccessResponse(response)) {
             // The API returns statistics in the "statistics" field
             const statsData = response.statistics || response.stats || null;
@@ -852,7 +966,6 @@ export const useCourseStore = create<CourseState>()(
             throw new Error(response.message || "Failed to fetch course stats");
           }
         } catch (error) {
-          console.error("getCourseStats error:", error);
           set({
             error:
               error instanceof Error

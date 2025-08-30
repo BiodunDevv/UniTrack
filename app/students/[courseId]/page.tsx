@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   BookOpen,
   CheckCircle,
+  Copy,
   Download,
   Loader2,
   Plus,
@@ -32,6 +33,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ConfirmationModal } from "@/components/ui/confirmation-modal";
+import { CopyStudentsModal } from "@/components/ui/copy-students-modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Pagination } from "@/components/ui/pagination";
@@ -227,7 +229,6 @@ function BulkStudentUploadSection({
         );
       }
     } catch (error: unknown) {
-      console.error("Upload error:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Failed to upload students";
       toast.error(errorMessage);
@@ -1260,6 +1261,7 @@ export default function StudentsPage() {
     getCourse,
     removeStudentFromCourse,
     clearError,
+    getAllCourses,
   } = useCourseStore();
 
   const [removingStudentId, setRemovingStudentId] = useState<string | null>(
@@ -1273,12 +1275,23 @@ export default function StudentsPage() {
     name: string;
   } | null>(null);
 
+  // Copy students state
+  const [showCopyDialog, setShowCopyDialog] = useState(false);
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const studentsPerPage = 10;
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Handle copy completion
+  const handleCopyComplete = async () => {
+    // Refresh the course data to show newly added students
+    await getCourse(courseId);
+    // Close the modal
+    setShowCopyDialog(false);
+  };
 
   // Fetch course data on mount
   React.useEffect(() => {
@@ -1309,11 +1322,33 @@ export default function StudentsPage() {
     if (!studentToRemove) return;
 
     setRemovingStudentId(studentToRemove.id);
+
+    // Show optimistic loading toast
+    const loadingToast = toast.loading(`Removing ${studentToRemove.name}...`, {
+      description: "This action cannot be undone.",
+    });
+
     try {
       await removeStudentFromCourse(courseId, studentToRemove.id);
-      toast.success("Student removed successfully!");
-    } catch {
-      toast.error("Failed to remove student");
+
+      // Dismiss loading toast and show success
+      toast.dismiss(loadingToast);
+      toast.success(`${studentToRemove.name} removed successfully!`, {
+        description: "The student has been removed from this course.",
+        duration: 4000,
+      });
+
+      // Refresh the course data to update student count and list
+      await getCourse(courseId);
+    } catch (error) {
+      // Dismiss loading toast and show error
+      toast.dismiss(loadingToast);
+      const errorMessage =
+        error instanceof Error ? error.message : "An unexpected error occurred";
+      toast.error("Failed to remove student", {
+        description: errorMessage,
+        duration: 4000,
+      });
     } finally {
       setRemovingStudentId(null);
       setShowConfirmationModal(false);
@@ -1323,6 +1358,17 @@ export default function StudentsPage() {
 
   const handleRefresh = () => {
     getCourse(courseId);
+  };
+
+  const openCopyDialog = async () => {
+    // Show modal immediately
+    setShowCopyDialog(true);
+
+    try {
+      await getAllCourses();
+    } catch {
+      toast.error("Failed to load courses");
+    }
   };
 
   // Format level for display
@@ -1442,7 +1488,7 @@ export default function StudentsPage() {
 
         {/* Stats */}
         <div className="animate-appear grid gap-4 opacity-0 delay-200 sm:grid-cols-3">
-          <Card className="border-border/50 bg-card/50 hover:bg-card/80 hover:shadow-primary/5 backdrop-blur-sm transition-all duration-500">
+          <Card className="group border-border/50 bg-card/50 hover:bg-card/80 hover:shadow-primary/5 backdrop-blur-sm transition-all duration-500">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
                 Total Students
@@ -1450,7 +1496,14 @@ export default function StudentsPage() {
               <Users className="text-muted-foreground h-4 w-4" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{students.length}</div>
+              <div className="group-hover:text-primary text-2xl font-bold transition-all duration-300">
+                {students.length}
+              </div>
+              <p className="text-muted-foreground text-xs">
+                {students.length === 1
+                  ? "student enrolled"
+                  : "students enrolled"}
+              </p>
             </CardContent>
           </Card>
 
@@ -1504,7 +1557,7 @@ export default function StudentsPage() {
           )}
 
           <Tabs defaultValue="student-list" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-fit grid-cols-3">
               <TabsTrigger value="student-list">Student List</TabsTrigger>
               <TabsTrigger value="add-single" disabled={hasActiveSession}>
                 Add Student
@@ -1519,7 +1572,20 @@ export default function StudentsPage() {
                 <CardHeader>
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <CardTitle>Current Students</CardTitle>
+                      <CardTitle className="flex items-center justify-between">
+                        <span>Current Students</span>
+                        {!hasActiveSession && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowCopyDialog(true)}
+                            className="ml-4"
+                          >
+                            <Copy className="mr-2 h-4 w-4" />
+                            Copy from Course
+                          </Button>
+                        )}
+                      </CardTitle>
                       <CardDescription>
                         Students currently enrolled in this course
                       </CardDescription>
@@ -1578,7 +1644,11 @@ export default function StudentsPage() {
                                 {paginatedStudents.map((student, index) => (
                                   <tr
                                     key={student._id}
-                                    className="border-border/50 hover:bg-muted/50 border-b transition-colors"
+                                    className={`border-border/50 hover:bg-muted/50 border-b transition-all duration-300 ${
+                                      removingStudentId === student._id
+                                        ? "bg-destructive/5 opacity-50"
+                                        : ""
+                                    }`}
                                   >
                                     <td className="px-2 py-3 whitespace-nowrap">
                                       <span className="text-xs font-medium">
@@ -1614,7 +1684,12 @@ export default function StudentsPage() {
                                         disabled={
                                           removingStudentId === student._id
                                         }
-                                        className="h-7 w-7 p-0"
+                                        className="h-7 w-7 p-0 transition-all duration-200 hover:scale-105"
+                                        title={
+                                          removingStudentId === student._id
+                                            ? "Removing student..."
+                                            : "Remove student from course"
+                                        }
                                       >
                                         {removingStudentId === student._id ? (
                                           <Loader2 className="h-3 w-3 animate-spin" />
@@ -1658,7 +1733,11 @@ export default function StudentsPage() {
                               {paginatedStudents.map((student, index) => (
                                 <tr
                                   key={student._id}
-                                  className="border-border/50 hover:bg-muted/50 border-b transition-colors"
+                                  className={`border-border/50 hover:bg-muted/50 border-b transition-all duration-300 ${
+                                    removingStudentId === student._id
+                                      ? "bg-destructive/5 opacity-50"
+                                      : ""
+                                  }`}
                                 >
                                   <td className="px-4 py-4">
                                     <span className="text-sm font-medium">
@@ -1690,7 +1769,12 @@ export default function StudentsPage() {
                                       disabled={
                                         removingStudentId === student._id
                                       }
-                                      className="h-8 w-8 p-0"
+                                      className="h-8 w-8 p-0 transition-all duration-200 hover:scale-105"
+                                      title={
+                                        removingStudentId === student._id
+                                          ? "Removing student..."
+                                          : "Remove student from course"
+                                      }
                                     >
                                       {removingStudentId === student._id ? (
                                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -1744,13 +1828,26 @@ export default function StudentsPage() {
             <TabsContent value="add-single" className="space-y-4">
               <Card className="group border-border/50 bg-card/50 hover:bg-card/80 hover:shadow-primary/5 backdrop-blur-sm transition-all duration-500 lg:col-span-2 xl:col-span-2">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <User className="h-5 w-5" />
-                    Add Single Student
-                  </CardTitle>
-                  <CardDescription>
-                    Add a new student to {currentCourse.title}
-                  </CardDescription>
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <User className="h-5 w-5" />
+                        Add Single Student
+                      </CardTitle>
+                      <CardDescription>
+                        Add a new student to {currentCourse.title}
+                      </CardDescription>
+                    </div>
+                    <Button
+                      onClick={openCopyDialog}
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-2"
+                    >
+                      <Copy className="h-4 w-4" />
+                      Copy Students
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <AddSingleStudentSection
@@ -1795,16 +1892,31 @@ export default function StudentsPage() {
           setStudentToRemove(null);
         }}
         onConfirm={confirmRemoveStudent}
-        title="Remove Student"
+        title="Remove Student from Course"
         description={
           studentToRemove
-            ? `Are you sure you want to remove ${studentToRemove.name} from this course? This action cannot be undone.`
-            : "Are you sure you want to remove this student?"
+            ? `Are you sure you want to remove "${studentToRemove.name}" from "${currentCourse.title}"? 
+
+This will:
+• Remove the student from this course permanently
+• Delete their attendance records for this course
+• Cannot be undone
+
+The student will need to be re-enrolled manually if needed.`
+            : "Are you sure you want to remove this student from the course?"
         }
-        confirmText="Remove Student"
+        confirmText="Yes, Remove Student"
         cancelText="Cancel"
         variant="destructive"
         isLoading={removingStudentId === studentToRemove?.id}
+      />
+
+      {/* Copy Students Modal */}
+      <CopyStudentsModal
+        isOpen={showCopyDialog}
+        onClose={() => setShowCopyDialog(false)}
+        currentCourseId={courseId}
+        onCopyComplete={handleCopyComplete}
       />
     </DashboardLayout>
   );

@@ -7,9 +7,11 @@ import {
   CheckCircle,
   Clock,
   Download,
+  FileText,
   Hash,
   MapPin,
   MapPinIcon,
+  MoreVertical,
   User,
   Users,
   XCircle,
@@ -22,10 +24,18 @@ import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  generateSessionPDF,
+  generateSessionSummaryPDF,
+} from "@/lib/pdf-generator";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  "https://unitrack-backend-hd9s.onrender.com/api";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "localhost:3000";
 
 // Function to get auth token from localStorage
 const getAuthToken = (): string | null => {
@@ -40,6 +50,27 @@ const getAuthToken = (): string | null => {
   }
   return null;
 };
+
+interface Student {
+  _id: string;
+  name: string;
+  email: string;
+  matric_no: string;
+  level: number;
+  attendance_status: "present" | "absent" | "rejected";
+  submitted_at: string | null;
+  location: {
+    latitude: number;
+    longitude: number;
+  } | null;
+  distance_from_session_m: number | null;
+  device_info: {
+    user_agent: string;
+    ip_address: string;
+  } | null;
+  reason: string | null;
+  has_submitted: boolean;
+}
 
 interface SessionDetailResponse {
   session: {
@@ -68,6 +99,11 @@ interface SessionDetailResponse {
     updatedAt: string;
     __v: number;
   };
+  students: {
+    all: Student[];
+    present: Student[];
+    absent: Student[];
+  };
   attendance: Array<{
     _id: string;
     session_id: string;
@@ -77,6 +113,7 @@ interface SessionDetailResponse {
       matric_no: string;
       name: string;
       email: string;
+      level: number;
     };
     matric_no_submitted: string;
     device_fingerprint: string;
@@ -92,11 +129,12 @@ interface SessionDetailResponse {
     __v: number;
   }>;
   statistics: {
+    total_enrolled: number;
     total_submissions: number;
     present_count: number;
     absent_count: number;
-    rejected_count: number;
     attendance_rate: number;
+    submission_rate: number;
   };
 }
 
@@ -183,34 +221,33 @@ export default function SessionDetailPage() {
     return <Badge variant="outline">Ended</Badge>;
   };
 
-  const downloadAttendanceReport = async () => {
+  const downloadDetailedPDF = () => {
+    if (!sessionData) return;
+
     try {
-      const token = getAuthToken();
-
-      if (!token) {
-        throw new Error("Authentication token not found");
-      }
-
-      const response = await fetch(
-        `${API_BASE_URL}/sessions/${sessionId}/report`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `session-${sessionData?.session.session_code}-attendance.csv`;
-        a.click();
-        window.URL.revokeObjectURL(url);
-      }
+      generateSessionPDF({
+        session: sessionData.session,
+        students: sessionData.students,
+        attendance: sessionData.attendance,
+        statistics: sessionData.statistics,
+      });
     } catch (error) {
-      console.error("Failed to download report:", error);
+      console.error("Failed to generate detailed PDF:", error);
+    }
+  };
+
+  const downloadSummaryPDF = () => {
+    if (!sessionData) return;
+
+    try {
+      generateSessionSummaryPDF({
+        session: sessionData.session,
+        students: sessionData.students,
+        attendance: sessionData.attendance,
+        statistics: sessionData.statistics,
+      });
+    } catch (error) {
+      console.error("Failed to generate summary PDF:", error);
     }
   };
 
@@ -244,7 +281,7 @@ export default function SessionDetailPage() {
     );
   }
 
-  const { session, attendance, statistics } = sessionData;
+  const { session, students, attendance, statistics } = sessionData;
 
   return (
     <DashboardLayout>
@@ -288,10 +325,26 @@ export default function SessionDetailPage() {
                 View Live
               </Button>
             )}
-            <Button variant="default" onClick={downloadAttendanceReport}>
-              <Download className="mr-2 h-4 w-4" />
-              Download Report
-            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="default">
+                  <Download className="mr-2 h-4 w-4" />
+                  Download Report
+                  <MoreVertical className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={downloadDetailedPDF}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  Detailed PDF Report
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={downloadSummaryPDF}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  Summary PDF Report
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -374,10 +427,10 @@ export default function SessionDetailPage() {
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-2 lg:gap-0 lg:space-y-4">
                   <div className="text-center lg:text-left">
                     <div className="text-primary text-xl font-bold sm:text-2xl">
-                      {statistics.total_submissions}
+                      {statistics.total_enrolled}
                     </div>
                     <div className="text-muted-foreground text-xs sm:text-sm">
-                      Total
+                      Enrolled
                     </div>
                   </div>
                   <div className="text-center lg:text-left">
@@ -390,10 +443,10 @@ export default function SessionDetailPage() {
                   </div>
                   <div className="text-center lg:text-left">
                     <div className="text-xl font-bold text-orange-600 sm:text-2xl">
-                      {statistics.rejected_count}
+                      {statistics.absent_count}
                     </div>
                     <div className="text-muted-foreground text-xs sm:text-sm">
-                      Rejected
+                      Absent
                     </div>
                   </div>
                   <div className="text-center lg:pt-4 lg:text-left">
@@ -433,18 +486,18 @@ export default function SessionDetailPage() {
                       variant="outline"
                       className="text-xs text-orange-600 sm:text-sm"
                     >
-                      Rejected: {statistics.rejected_count}
+                      Absent: {statistics.absent_count}
                     </Badge>
                   </div>
                 )}
               </div>
             </CardHeader>
             <CardContent className="p-0 sm:p-6">
-              {attendance.length === 0 ? (
+              {students.all.length === 0 ? (
                 <div className="px-6 py-8 text-center">
                   <Users className="text-muted-foreground/50 mx-auto mb-4 h-12 w-12" />
                   <p className="text-muted-foreground">
-                    No attendance records yet
+                    No students enrolled in this session
                   </p>
                   {session.is_active && (
                     <p className="text-muted-foreground mt-2 text-sm">
@@ -488,30 +541,60 @@ export default function SessionDetailPage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {attendance
-                              .sort(
-                                (a, b) =>
-                                  new Date(a.submitted_at).getTime() -
-                                  new Date(b.submitted_at).getTime(),
-                              )
-                              .map((record, index) => {
-                                const distance = calculateDistance(
-                                  record.lat,
-                                  record.lng,
-                                  session.lat,
-                                  session.lng,
+                            {students.all
+                              .sort((a, b) => {
+                                // Sort by attendance status (present first), then by name
+                                if (
+                                  a.attendance_status !== b.attendance_status
+                                ) {
+                                  if (a.attendance_status === "present")
+                                    return -1;
+                                  if (b.attendance_status === "present")
+                                    return 1;
+                                  return 0;
+                                }
+                                return a.name.localeCompare(b.name);
+                              })
+                              .map((student, index) => {
+                                // Find matching attendance record if exists
+                                const attendanceRecord = attendance.find(
+                                  (record) =>
+                                    record.student_id._id === student._id,
                                 );
-                                const isWithinRadius =
-                                  distance <= session.radius_m;
+
+                                // Calculate distance if attendance record exists and has location
+                                let distance = null;
+                                if (
+                                  attendanceRecord &&
+                                  attendanceRecord.lat &&
+                                  attendanceRecord.lng
+                                ) {
+                                  distance = calculateDistance(
+                                    attendanceRecord.lat,
+                                    attendanceRecord.lng,
+                                    session.lat,
+                                    session.lng,
+                                  );
+                                } else if (
+                                  student.distance_from_session_m !== null
+                                ) {
+                                  // Fallback to student's distance if available
+                                  distance = student.distance_from_session_m;
+                                }
+
+                                const isWithinRadius = distance
+                                  ? distance <= session.radius_m
+                                  : false;
 
                                 return (
                                   <tr
-                                    key={record._id}
+                                    key={student._id}
                                     className="border-border/50 hover:bg-muted/50 border-b transition-colors"
                                   >
                                     <td className="px-2 py-3 whitespace-nowrap">
                                       <div className="flex items-center gap-1">
-                                        {record.status === "present" ? (
+                                        {student.attendance_status ===
+                                        "present" ? (
                                           <CheckCircle className="h-3 w-3 flex-shrink-0 text-green-500" />
                                         ) : (
                                           <XCircle className="h-3 w-3 flex-shrink-0 text-red-500" />
@@ -524,54 +607,71 @@ export default function SessionDetailPage() {
                                     <td className="px-2 py-3">
                                       <div className="min-w-[120px]">
                                         <p className="truncate text-xs font-medium">
-                                          {record.student_id.name}
+                                          {student.name}
                                         </p>
                                         <p className="text-muted-foreground truncate text-xs">
-                                          {record.student_id.matric_no}
+                                          {student.matric_no}
                                         </p>
                                       </div>
                                     </td>
                                     <td className="px-2 py-3 whitespace-nowrap">
                                       <Badge
                                         variant={
-                                          record.status === "present"
+                                          student.attendance_status ===
+                                          "present"
                                             ? "default"
-                                            : record.status === "rejected"
+                                            : student.attendance_status ===
+                                                "rejected"
                                               ? "destructive"
                                               : "secondary"
                                         }
                                         className="text-xs"
                                       >
-                                        {record.status.toUpperCase()}
+                                        {student.attendance_status.toUpperCase()}
                                       </Badge>
                                     </td>
                                     <td className="px-2 py-3 whitespace-nowrap">
-                                      <span
-                                        className={`rounded px-2 py-1 text-xs ${
-                                          isWithinRadius
-                                            ? "bg-green-100 text-green-700"
-                                            : "bg-red-100 text-red-700"
-                                        }`}
-                                      >
-                                        {Math.round(distance)}m
-                                      </span>
+                                      {distance !== null ? (
+                                        <span
+                                          className={`rounded px-2 py-1 text-xs ${
+                                            isWithinRadius
+                                              ? "bg-green-100 text-green-700"
+                                              : "bg-red-100 text-red-700"
+                                          }`}
+                                        >
+                                          {Math.round(distance)}m
+                                        </span>
+                                      ) : (
+                                        <span className="text-muted-foreground text-xs">
+                                          -
+                                        </span>
+                                      )}
                                     </td>
                                     <td className="px-2 py-3 whitespace-nowrap">
-                                      <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-700">
-                                        ±{record.accuracy}m
-                                      </span>
+                                      {attendanceRecord ? (
+                                        <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-700">
+                                          ±{attendanceRecord.accuracy}m
+                                        </span>
+                                      ) : (
+                                        <span className="text-muted-foreground text-xs">
+                                          -
+                                        </span>
+                                      )}
                                     </td>
                                     <td className="px-2 py-3 whitespace-nowrap">
                                       <p className="min-w-[100px] text-xs">
-                                        {formatDateTime(record.submitted_at)}
+                                        {student.submitted_at
+                                          ? formatDateTime(student.submitted_at)
+                                          : "-"}
                                       </p>
                                     </td>
                                     <td className="px-2 py-3 whitespace-nowrap">
                                       <div className="flex min-w-[100px] items-center gap-1">
                                         <MapPinIcon className="text-muted-foreground h-3 w-3 flex-shrink-0" />
                                         <p className="text-muted-foreground truncate text-xs">
-                                          {record.lat.toFixed(4)},{" "}
-                                          {record.lng.toFixed(4)}
+                                          {attendanceRecord
+                                            ? `${attendanceRecord.lat.toFixed(4)}, ${attendanceRecord.lng.toFixed(4)}`
+                                            : "-"}
                                         </p>
                                       </div>
                                     </td>
@@ -614,30 +714,57 @@ export default function SessionDetailPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {attendance
-                            .sort(
-                              (a, b) =>
-                                new Date(a.submitted_at).getTime() -
-                                new Date(b.submitted_at).getTime(),
-                            )
-                            .map((record, index) => {
-                              const distance = calculateDistance(
-                                record.lat,
-                                record.lng,
-                                session.lat,
-                                session.lng,
+                          {students.all
+                            .sort((a, b) => {
+                              // Sort by attendance status (present first), then by name
+                              if (a.attendance_status !== b.attendance_status) {
+                                if (a.attendance_status === "present")
+                                  return -1;
+                                if (b.attendance_status === "present") return 1;
+                                return 0;
+                              }
+                              return a.name.localeCompare(b.name);
+                            })
+                            .map((student, index) => {
+                              // Find matching attendance record if exists
+                              const attendanceRecord = attendance.find(
+                                (record) =>
+                                  record.student_id._id === student._id,
                               );
-                              const isWithinRadius =
-                                distance <= session.radius_m;
+
+                              // Calculate distance if attendance record exists and has location
+                              let distance = null;
+                              if (
+                                attendanceRecord &&
+                                attendanceRecord.lat &&
+                                attendanceRecord.lng
+                              ) {
+                                distance = calculateDistance(
+                                  attendanceRecord.lat,
+                                  attendanceRecord.lng,
+                                  session.lat,
+                                  session.lng,
+                                );
+                              } else if (
+                                student.distance_from_session_m !== null
+                              ) {
+                                // Fallback to student's distance if available
+                                distance = student.distance_from_session_m;
+                              }
+
+                              const isWithinRadius = distance
+                                ? distance <= session.radius_m
+                                : false;
 
                               return (
                                 <tr
-                                  key={record._id}
+                                  key={student._id}
                                   className="border-border/50 hover:bg-muted/50 border-b transition-colors"
                                 >
                                   <td className="px-4 py-4">
                                     <div className="flex items-center gap-2">
-                                      {record.status === "present" ? (
+                                      {student.attendance_status ===
+                                      "present" ? (
                                         <CheckCircle className="h-4 w-4 text-green-500" />
                                       ) : (
                                         <XCircle className="h-4 w-4 text-red-500" />
@@ -650,13 +777,13 @@ export default function SessionDetailPage() {
                                   <td className="px-4 py-4">
                                     <div>
                                       <p className="text-sm font-medium">
-                                        {record.student_id.name}
+                                        {student.name}
                                       </p>
                                       <p className="text-muted-foreground text-xs">
-                                        {record.student_id.matric_no}
+                                        {student.matric_no}
                                       </p>
                                       <p className="text-muted-foreground text-xs">
-                                        {record.student_id.email}
+                                        {student.email}
                                       </p>
                                     </div>
                                   </td>
@@ -664,50 +791,67 @@ export default function SessionDetailPage() {
                                     <div className="space-y-1">
                                       <Badge
                                         variant={
-                                          record.status === "present"
+                                          student.attendance_status ===
+                                          "present"
                                             ? "default"
-                                            : record.status === "rejected"
+                                            : student.attendance_status ===
+                                                "rejected"
                                               ? "destructive"
                                               : "secondary"
                                         }
                                         className="text-xs"
                                       >
-                                        {record.status.toUpperCase()}
+                                        {student.attendance_status.toUpperCase()}
                                       </Badge>
-                                      {record.reason && (
+                                      {student.reason && (
                                         <p className="text-muted-foreground text-xs italic">
-                                          {record.reason}
+                                          {student.reason}
                                         </p>
                                       )}
                                     </div>
                                   </td>
                                   <td className="px-4 py-4">
-                                    <span
-                                      className={`rounded px-2 py-1 text-xs ${
-                                        isWithinRadius
-                                          ? "bg-green-100 text-green-700"
-                                          : "bg-red-100 text-red-700"
-                                      }`}
-                                    >
-                                      {Math.round(distance)}m
-                                    </span>
+                                    {distance !== null ? (
+                                      <span
+                                        className={`rounded px-2 py-1 text-xs ${
+                                          isWithinRadius
+                                            ? "bg-green-100 text-green-700"
+                                            : "bg-red-100 text-red-700"
+                                        }`}
+                                      >
+                                        {Math.round(distance)}m
+                                      </span>
+                                    ) : (
+                                      <span className="text-muted-foreground text-xs">
+                                        -
+                                      </span>
+                                    )}
                                   </td>
                                   <td className="px-4 py-4">
-                                    <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-700">
-                                      ±{record.accuracy}m
-                                    </span>
+                                    {attendanceRecord ? (
+                                      <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-700">
+                                        ±{attendanceRecord.accuracy}m
+                                      </span>
+                                    ) : (
+                                      <span className="text-muted-foreground text-xs">
+                                        -
+                                      </span>
+                                    )}
                                   </td>
                                   <td className="px-4 py-4">
                                     <p className="text-sm">
-                                      {formatDateTime(record.submitted_at)}
+                                      {student.submitted_at
+                                        ? formatDateTime(student.submitted_at)
+                                        : "-"}
                                     </p>
                                   </td>
                                   <td className="px-4 py-4">
                                     <div className="flex items-center gap-1">
                                       <MapPinIcon className="text-muted-foreground h-3 w-3" />
                                       <p className="text-muted-foreground text-xs">
-                                        {record.lat.toFixed(4)},{" "}
-                                        {record.lng.toFixed(4)}
+                                        {attendanceRecord
+                                          ? `${attendanceRecord.lat.toFixed(4)}, ${attendanceRecord.lng.toFixed(4)}`
+                                          : "-"}
                                       </p>
                                     </div>
                                   </td>

@@ -228,6 +228,10 @@ export function DashboardLayout({
                     <Button
                       variant="ghost"
                       className="hover:bg-accent/50 w-full justify-start transition-colors duration-200"
+                      onClick={() => {
+                        setSettingsOpen(false);
+                        router.push("/profile");
+                      }}
                     >
                       <User className="mr-3 h-4 w-4" />
                       Profile Settings
@@ -249,6 +253,10 @@ export function DashboardLayout({
                     <Button
                       variant="ghost"
                       className="hover:bg-accent/50 w-full justify-start transition-colors duration-200"
+                      onClick={() => {
+                        setSettingsOpen(false);
+                        router.push("/help");
+                      }}
                     >
                       <HelpCircle className="mr-3 h-4 w-4" />
                       Help & Support

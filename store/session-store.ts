@@ -1,9 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  "https://unitrack-backend-hd9s.onrender.com/api";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "localhost:3000";
 
 // Function to get auth token from localStorage (where zustand stores it)
 const getAuthToken = (): string | null => {

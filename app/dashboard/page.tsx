@@ -12,6 +12,7 @@ import {
   Users,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -24,6 +25,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { CourseSelectionModal } from "@/components/ui/course-selection-modal";
 import { Separator } from "@/components/ui/separator";
 
 import attendanceData from "./attendance-data.json";
@@ -122,6 +124,14 @@ const recentActivity = [
 
 export default function DashboardPage() {
   const router = useRouter();
+  const [showCourseSelectionModal, setShowCourseSelectionModal] =
+    useState(false);
+
+  // Handle session started callback
+  const handleSessionStarted = (sessionId: string, courseId: string) => {
+    // Navigate to the course page to see the active session
+    router.push(`/course/${courseId}`);
+  };
 
   return (
     <DashboardLayout>
@@ -164,7 +174,7 @@ export default function DashboardPage() {
             return (
               <Card
                 key={index}
-                className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 animate-appear opacity-0 backdrop-blur-sm transition-all duration-500 hover:-translate-y-1 hover:scale-[1.02] hover:shadow-lg"
+                className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 animate-appear opacity-0 backdrop-blur-sm transition-all duration-500 hover:shadow-lg"
                 style={{ animationDelay: `${300 + index * 100}ms` }}
               >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -227,7 +237,7 @@ export default function DashboardPage() {
                 </Button>
 
                 <Button
-                  onClick={() => router.push("/dashboard/sessions/create")}
+                  onClick={() => setShowCourseSelectionModal(true)}
                   className="flex h-auto flex-col gap-2 p-4 text-left"
                   variant="outline"
                 >
@@ -470,6 +480,13 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Course Selection Modal */}
+      <CourseSelectionModal
+        isOpen={showCourseSelectionModal}
+        onClose={() => setShowCourseSelectionModal(false)}
+        onSessionStarted={handleSessionStarted}
+      />
     </DashboardLayout>
   );
 }

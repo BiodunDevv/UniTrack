@@ -40,6 +40,7 @@ interface AuthState {
     otp: string,
     newPassword: string,
   ) => Promise<void>;
+  updateUser: (userData: Partial<User>) => void;
   clearError: () => void;
   clearTokens: () => void;
   setLoading: (loading: boolean) => void;
@@ -422,6 +423,11 @@ export const useAuthStore = create<AuthState>()(
           registrationToken: null,
           verificationToken: null,
         }),
+
+      updateUser: (userData: Partial<User>) =>
+        set((state) => ({
+          user: state.user ? { ...state.user, ...userData } : null,
+        })),
 
       setLoading: (loading: boolean) => set({ isLoading: loading }),
     }),

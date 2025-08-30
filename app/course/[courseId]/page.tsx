@@ -485,7 +485,7 @@ export default function CoursePage() {
                 size="sm"
                 variant="outline"
                 onClick={() => router.push(`/course`)}
-                className="hover:bg-accent hover:text-accent-foreground transition-all duration-300 hover:scale-105 md:hidden"
+                className="hover:bg-accent hover:text-accent-foreground transition-all duration-300 md:hidden"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to Courses
@@ -515,7 +515,7 @@ export default function CoursePage() {
                       router.push(`/session/${activeSession._id}/live`);
                     }
                   }}
-                  className="bg-blue-600 transition-all duration-300 hover:scale-105 hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-600/20"
+                  className="bg-blue-600 transition-all duration-300 hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-600/20"
                 >
                   <Activity className="mr-2 h-4 w-4" />
                   View Live Session
@@ -531,7 +531,7 @@ export default function CoursePage() {
                     }
                   }}
                   variant="default"
-                  className="transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-red-600/20"
+                  className="transition-all duration-300 hover:shadow-lg hover:shadow-red-600/20"
                 >
                   <Square className="mr-2 h-4 w-4" />
                   Stop Session
@@ -547,15 +547,21 @@ export default function CoursePage() {
                 <Button
                   onClick={() => router.push(`/students/${courseId}`)}
                   variant="outline"
-                  className="border-border/50 bg-background/50 transition-all duration-300 hover:scale-105 hover:bg-purple-600 hover:text-white hover:shadow-lg hover:shadow-purple-600/20"
+                  className="border-border/50 bg-background/50 transition-all duration-300 hover:bg-purple-600 hover:text-white hover:shadow-lg hover:shadow-purple-600/20"
                 >
                   <Users className="mr-2 h-4 w-4" />
-                  View All Students
+                {
+                  stats?.total_students === 0 || students.length === 0 
+                    ? "Add Students" 
+                    : stats?.total_students === 1 || students.length === 1 
+                      ? "View Student" 
+                      : "View Students"
+                }
                 </Button>
                 <Button
                   onClick={() => setShowUpdateCourseModal(true)}
                   variant="outline"
-                  className="border-border/50 bg-background/50 transition-all duration-300 hover:scale-105 hover:bg-orange-600 hover:text-white hover:shadow-lg hover:shadow-orange-600/20"
+                  className="border-border/50 bg-background/50 transition-all duration-300 hover:bg-orange-600 hover:text-white hover:shadow-lg hover:shadow-orange-600/20"
                 >
                   <Edit className="mr-2 h-4 w-4" />
                   Edit Course
@@ -565,7 +571,7 @@ export default function CoursePage() {
 
             <Button
               onClick={() => setShowStartSessionModal(true)}
-              className="bg-green-600 transition-all duration-300 hover:scale-105 hover:bg-green-700 hover:shadow-lg hover:shadow-green-600/20"
+              className="bg-green-600 transition-all duration-300 hover:bg-green-700 hover:shadow-lg hover:shadow-green-600/20"
               disabled={sessions.some(
                 (session) => session.is_active || session.status === "active",
               )}
@@ -582,7 +588,7 @@ export default function CoursePage() {
 
         {/* Stats Cards */}
         <div className="animate-appear grid gap-4 opacity-0 delay-200 sm:grid-cols-2 lg:grid-cols-4">
-          <Card className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 backdrop-blur-sm transition-all duration-500 hover:-translate-y-1 hover:scale-[1.02] hover:shadow-lg">
+          <Card className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 backdrop-blur-sm transition-all duration-500 hover:shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="group-hover:text-primary text-sm font-medium transition-colors duration-300">
                 Total Students
@@ -601,7 +607,7 @@ export default function CoursePage() {
             </CardContent>
           </Card>
 
-          <Card className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 backdrop-blur-sm transition-all duration-500 hover:-translate-y-1 hover:scale-[1.02] hover:shadow-lg">
+          <Card className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 backdrop-blur-sm transition-all duration-500 hover:shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="group-hover:text-primary text-sm font-medium transition-colors duration-300">
                 Active Sessions
@@ -620,7 +626,7 @@ export default function CoursePage() {
             </CardContent>
           </Card>
 
-          <Card className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 backdrop-blur-sm transition-all duration-500 hover:-translate-y-1 hover:scale-[1.02] hover:shadow-lg">
+          <Card className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 backdrop-blur-sm transition-all duration-500 hover:shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="group-hover:text-primary text-sm font-medium transition-colors duration-300">
                 Average Attendance
@@ -642,7 +648,7 @@ export default function CoursePage() {
             </CardContent>
           </Card>
 
-          <Card className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 backdrop-blur-sm transition-all duration-500 hover:-translate-y-1 hover:scale-[1.02] hover:shadow-lg">
+          <Card className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 backdrop-blur-sm transition-all duration-500 hover:shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="group-hover:text-primary text-sm font-medium transition-colors duration-300">
                 Present Today

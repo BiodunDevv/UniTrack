@@ -5,8 +5,10 @@ import {
   BookOpen,
   Calendar,
   GraduationCap,
+  HelpCircle,
   PanelRightClose,
   Plus,
+  User,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
@@ -134,6 +136,28 @@ export function CustomSidebar({ onClose }: CustomSidebarProps) {
           {
             title: "All Sessions",
             url: "/session",
+          },
+        ],
+      },
+      {
+        title: "Profile",
+        url: "/profile",
+        icon: User,
+        items: [
+          {
+            title: "Profile Settings",
+            url: "/profile",
+          },
+        ],
+      },
+      {
+        title: "Help & Support",
+        url: "/help",
+        icon: HelpCircle,
+        items: [
+          {
+            title: "FAQ",
+            url: "/help",
           },
         ],
       },
