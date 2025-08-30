@@ -7,7 +7,7 @@ interface Student {
   email: string;
   matric_no: string;
   level: number;
-  attendance_status: "present" | "absent" | "rejected";
+  attendance_status: "present" | "absent" | "rejected" | "manual_present";
   submitted_at: string | null;
   location: {
     latitude: number;
@@ -38,7 +38,7 @@ interface AttendanceRecord {
   lat: number;
   lng: number;
   accuracy: number;
-  status: "present" | "absent" | "rejected";
+  status: "present" | "absent" | "rejected" | "manual_present";
   reason: string;
   receipt_signature: string;
   submitted_at: string;
@@ -214,7 +214,7 @@ export const generateSessionPDF = (sessionData: SessionData) => {
     (index + 1).toString(),
     student.name,
     student.matric_no,
-    student.attendance_status.toUpperCase(),
+    student.attendance_status === "manual_present" ? "MANUAL PRESENT" : student.attendance_status.toUpperCase(),
     student.submitted_at ? formatDate(student.submitted_at) : "Not Submitted",
   ]);
 
@@ -247,7 +247,7 @@ export const generateSessionPDF = (sessionData: SessionData) => {
       // Color code status column
       if (data.column.index === 3 && data.row.index >= 0) {
         const status = String(data.cell.raw).toLowerCase();
-        if (status === "present") {
+        if (status === "present" || status === "manual present") {
           data.cell.styles.textColor = successGreen;
           data.cell.styles.fontStyle = "bold";
         } else if (status === "absent") {

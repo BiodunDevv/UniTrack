@@ -6,6 +6,7 @@ import {
   CheckCircle,
   Copy,
   Download,
+  Eye,
   Loader2,
   Plus,
   Search,
@@ -1675,28 +1676,42 @@ export default function StudentsPage() {
                                       </div>
                                     </td>
                                     <td className="px-2 py-3 whitespace-nowrap">
-                                      <Button
-                                        variant="destructive"
-                                        size="sm"
-                                        onClick={() =>
-                                          handleRemoveStudent(student._id)
-                                        }
-                                        disabled={
-                                          removingStudentId === student._id
-                                        }
-                                        className="h-7 w-7 p-0 transition-all duration-200 hover:scale-105"
-                                        title={
-                                          removingStudentId === student._id
-                                            ? "Removing student..."
-                                            : "Remove student from course"
-                                        }
-                                      >
-                                        {removingStudentId === student._id ? (
-                                          <Loader2 className="h-3 w-3 animate-spin" />
-                                        ) : (
-                                          <Trash2 className="h-3 w-3" />
-                                        )}
-                                      </Button>
+                                      <div className="flex gap-1">
+                                        <Button
+                                          size="sm"
+                                          onClick={() =>
+                                            router.push(
+                                              `/students/${courseId}/${student._id}/attendance`,
+                                            )
+                                          }
+                                          className="h-7 w-7 p-0 transition-all duration-200 hover:scale-105"
+                                          title="View attendance history"
+                                        >
+                                          <Eye className="h-3 w-3" />
+                                        </Button>
+                                        <Button
+                                          variant="destructive"
+                                          size="sm"
+                                          onClick={() =>
+                                            handleRemoveStudent(student._id)
+                                          }
+                                          disabled={
+                                            removingStudentId === student._id
+                                          }
+                                          className="h-7 w-7 p-0 transition-all duration-200 hover:scale-105"
+                                          title={
+                                            removingStudentId === student._id
+                                              ? "Removing student..."
+                                              : "Remove student from course"
+                                          }
+                                        >
+                                          {removingStudentId === student._id ? (
+                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                          ) : (
+                                            <Trash2 className="h-3 w-3" />
+                                          )}
+                                        </Button>
+                                      </div>
                                     </td>
                                   </tr>
                                 ))}
@@ -1760,28 +1775,42 @@ export default function StudentsPage() {
                                     </p>
                                   </td>
                                   <td className="px-4 py-4">
-                                    <Button
-                                      variant="destructive"
-                                      size="sm"
-                                      onClick={() =>
-                                        handleRemoveStudent(student._id)
-                                      }
-                                      disabled={
-                                        removingStudentId === student._id
-                                      }
-                                      className="h-8 w-8 p-0 transition-all duration-200 hover:scale-105"
-                                      title={
-                                        removingStudentId === student._id
-                                          ? "Removing student..."
-                                          : "Remove student from course"
-                                      }
-                                    >
-                                      {removingStudentId === student._id ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                      ) : (
-                                        <Trash2 className="h-4 w-4" />
-                                      )}
-                                    </Button>
+                                    <div className="flex gap-2">
+                                      <Button
+                                        size="sm"
+                                        onClick={() =>
+                                          router.push(
+                                            `/students/${courseId}/${student._id}/attendance`,
+                                          )
+                                        }
+                                        className="h-8 w-8 p-0 transition-all duration-200 hover:scale-105"
+                                        title="View attendance history"
+                                      >
+                                        <Eye className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        onClick={() =>
+                                          handleRemoveStudent(student._id)
+                                        }
+                                        disabled={
+                                          removingStudentId === student._id
+                                        }
+                                        className="h-8 w-8 p-0 transition-all duration-200 hover:scale-105"
+                                        title={
+                                          removingStudentId === student._id
+                                            ? "Removing student..."
+                                            : "Remove student from course"
+                                        }
+                                      >
+                                        {removingStudentId === student._id ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <Trash2 className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                    </div>
                                   </td>
                                 </tr>
                               ))}

@@ -550,13 +550,11 @@ export default function CoursePage() {
                   className="border-border/50 bg-background/50 transition-all duration-300 hover:bg-purple-600 hover:text-white hover:shadow-lg hover:shadow-purple-600/20"
                 >
                   <Users className="mr-2 h-4 w-4" />
-                {
-                  stats?.total_students === 0 || students.length === 0 
-                    ? "Add Students" 
-                    : stats?.total_students === 1 || students.length === 1 
-                      ? "View Student" 
-                      : "View Students"
-                }
+                  {stats?.total_students === 0 || students.length === 0
+                    ? "Add Students"
+                    : stats?.total_students === 1 || students.length === 1
+                      ? "View Student"
+                      : "View Students"}
                 </Button>
                 <Button
                   onClick={() => setShowUpdateCourseModal(true)}
@@ -879,7 +877,7 @@ export default function CoursePage() {
                                       </td>
                                       <td className="px-2 py-3 whitespace-nowrap">
                                         <Button
-                                          variant="outline"
+                                          variant="default"
                                           size="sm"
                                           onClick={() =>
                                             router.push(
@@ -1076,23 +1074,37 @@ export default function CoursePage() {
                                       </div>
                                     </td>
                                     <td className="px-2 py-3 whitespace-nowrap">
-                                      <Button
-                                        variant="destructive"
-                                        size="sm"
-                                        onClick={() =>
-                                          handleRemoveStudent(student._id)
-                                        }
-                                        disabled={
-                                          removingStudentId === student._id
-                                        }
-                                        className="h-7 w-7 p-0"
-                                      >
-                                        {removingStudentId === student._id ? (
-                                          <Loader2 className="h-3 w-3 animate-spin" />
-                                        ) : (
-                                          <Trash2 className="h-3 w-3" />
-                                        )}
-                                      </Button>
+                                      <div className="flex gap-1">
+                                        <Button
+                                          size="sm"
+                                          onClick={() =>
+                                            router.push(
+                                              `/students/${courseId}/${student._id}/attendance`,
+                                            )
+                                          }
+                                          className="h-7 w-7 p-0 transition-all duration-200 hover:scale-105"
+                                          title="View attendance history"
+                                        >
+                                          <Eye className="h-3 w-3" />
+                                        </Button>
+                                        <Button
+                                          variant="destructive"
+                                          size="sm"
+                                          onClick={() =>
+                                            handleRemoveStudent(student._id)
+                                          }
+                                          disabled={
+                                            removingStudentId === student._id
+                                          }
+                                          className="h-7 w-7 p-0"
+                                        >
+                                          {removingStudentId === student._id ? (
+                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                          ) : (
+                                            <Trash2 className="h-3 w-3" />
+                                          )}
+                                        </Button>
+                                      </div>
                                     </td>
                                   </tr>
                                 ))}
@@ -1152,23 +1164,37 @@ export default function CoursePage() {
                                     </p>
                                   </td>
                                   <td className="px-4 py-4">
-                                    <Button
-                                      variant="destructive"
-                                      size="sm"
-                                      onClick={() =>
-                                        handleRemoveStudent(student._id)
-                                      }
-                                      disabled={
-                                        removingStudentId === student._id
-                                      }
-                                      className="h-8 w-8 p-0"
-                                    >
-                                      {removingStudentId === student._id ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                      ) : (
-                                        <Trash2 className="h-4 w-4" />
-                                      )}
-                                    </Button>
+                                    <div className="flex gap-2">
+                                      <Button
+                                        size="sm"
+                                        onClick={() =>
+                                          router.push(
+                                            `/students/${courseId}/${student._id}/attendance`,
+                                          )
+                                        }
+                                        className="h-8 w-8 p-0 transition-all duration-200 hover:scale-105"
+                                        title="View attendance history"
+                                      >
+                                        <Eye className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        onClick={() =>
+                                          handleRemoveStudent(student._id)
+                                        }
+                                        disabled={
+                                          removingStudentId === student._id
+                                        }
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        {removingStudentId === student._id ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <Trash2 className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                    </div>
                                   </td>
                                 </tr>
                               ))}

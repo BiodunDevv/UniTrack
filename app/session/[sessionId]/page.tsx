@@ -8,16 +8,21 @@ import {
   Clock,
   Download,
   FileText,
+  Filter,
   Hash,
   MapPin,
   MapPinIcon,
   MoreVertical,
+  Search,
   User,
+  UserCheck,
   Users,
+  X,
   XCircle,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import * as React from "react";
+import { toast } from "sonner";
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +35,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { ManualAttendanceModal } from "@/components/ui/manual-attendance-modal";
 import {
   generateSessionPDF,
   generateSessionSummaryPDF,
@@ -57,7 +64,7 @@ interface Student {
   email: string;
   matric_no: string;
   level: number;
-  attendance_status: "present" | "absent" | "rejected";
+  attendance_status: "present" | "absent" | "rejected" | "manual_present";
   submitted_at: string | null;
   location: {
     latitude: number;
@@ -148,6 +155,20 @@ export default function SessionDetailPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
+  // Manual attendance state
+  const [showManualAttendanceModal, setShowManualAttendanceModal] =
+    React.useState(false);
+  const [selectedStudent, setSelectedStudent] = React.useState<Student | null>(
+    null,
+  );
+  const [isUpdatingAttendance, setIsUpdatingAttendance] = React.useState(false);
+
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [statusFilter, setStatusFilter] = React.useState<
+    "all" | "present" | "absent"
+  >("all");
+
   // Fetch session details
   React.useEffect(() => {
     const fetchSessionDetails = async () => {
@@ -219,6 +240,134 @@ export default function SessionDetailPage() {
       return <Badge className="bg-green-500">Active</Badge>;
     }
     return <Badge variant="outline">Ended</Badge>;
+  };
+
+  // Manual attendance functions
+  const handleManualAttendance = (student: Student) => {
+    setSelectedStudent(student);
+    setShowManualAttendanceModal(true);
+  };
+
+  const submitManualAttendance = async (reason: string) => {
+    if (!selectedStudent || !sessionData) return;
+
+    setIsUpdatingAttendance(true);
+
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        throw new Error("Authentication token not found");
+      }
+
+      const courseId = sessionData.session.course_id._id;
+      const studentId = selectedStudent._id;
+
+      const response = await fetch(
+        `${API_BASE_URL}/courses/${courseId}/students/${studentId}/mark`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            sessionId: sessionId,
+            status: "manual_present",
+            reason: reason,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.message || `HTTP error! status: ${response.status}`,
+        );
+      }
+
+      const result = await response.json();
+      console.log("Manual attendance result:", result);
+
+      toast.success(`Attendance marked for ${selectedStudent.name}`, {
+        description: "Student has been manually marked as present",
+        duration: 4000,
+      });
+
+      // Refresh session data to reflect changes
+      const refreshResponse = await fetch(
+        `${API_BASE_URL}/sessions/${sessionId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (refreshResponse.ok) {
+        const refreshedData = await refreshResponse.json();
+        setSessionData(refreshedData);
+      }
+
+      // Close modal and reset
+      setShowManualAttendanceModal(false);
+      setSelectedStudent(null);
+    } catch (error) {
+      console.error("Manual attendance error:", error);
+      toast.error("Failed to mark attendance", {
+        description:
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred",
+        duration: 4000,
+      });
+    } finally {
+      setIsUpdatingAttendance(false);
+    }
+  };
+
+  // Filter and search functions
+  const getFilteredStudents = () => {
+    if (!sessionData) return [];
+
+    let filtered = sessionData.students.all;
+
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (student) =>
+          student.name.toLowerCase().includes(query) ||
+          student.matric_no.toLowerCase().includes(query),
+      );
+    }
+
+    // Apply status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((student) => {
+        if (statusFilter === "present") {
+          // Include both "present" and "manual_present" students in present filter
+          return student.attendance_status === "present" || student.attendance_status === "manual_present";
+        }
+        return student.attendance_status === statusFilter;
+      });
+    }
+
+    // Sort by attendance status (present first), then by name
+    return filtered.sort((a, b) => {
+      // Helper function to determine if status is considered "present"
+      const isPresent = (status: string) => status === "present" || status === "manual_present";
+      
+      const aIsPresent = isPresent(a.attendance_status);
+      const bIsPresent = isPresent(b.attendance_status);
+      
+      if (aIsPresent !== bIsPresent) {
+        if (aIsPresent) return -1;
+        if (bIsPresent) return 1;
+        return 0;
+      }
+      return a.name.localeCompare(b.name);
+    });
   };
 
   const downloadDetailedPDF = () => {
@@ -471,7 +620,7 @@ export default function SessionDetailPage() {
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5 flex-shrink-0" />
                   <span className="truncate">
-                    Attendance Records ({attendance.length})
+                    Attendance Records ({getFilteredStudents().length})
                   </span>
                 </CardTitle>
                 {attendance.length > 0 && (
@@ -491,6 +640,72 @@ export default function SessionDetailPage() {
                   </div>
                 )}
               </div>
+
+              {/* Search and Filter Controls */}
+              {students.all.length > 0 && (
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                  {/* Search Bar */}
+                  <div className="relative flex-1 sm:max-w-sm">
+                    <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                    <Input
+                      type="text"
+                      placeholder="Search by name or matric number..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pr-10 pl-10"
+                    />
+                    {searchQuery && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSearchQuery("")}
+                        className="absolute top-1/2 right-1 h-7 w-7 -translate-y-1/2 p-0"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Status Filter */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="flex items-center gap-2"
+                      >
+                        <Filter className="h-4 w-4" />
+                        {statusFilter === "all"
+                          ? "All Students"
+                          : statusFilter === "present"
+                            ? "Present Only"
+                            : "Absent Only"}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-40">
+                      <DropdownMenuItem
+                        onClick={() => setStatusFilter("all")}
+                        className={statusFilter === "all" ? "bg-accent" : ""}
+                      >
+                        All Students
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => setStatusFilter("present")}
+                        className={
+                          statusFilter === "present" ? "bg-accent" : ""
+                        }
+                      >
+                        Present Only
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => setStatusFilter("absent")}
+                        className={statusFilter === "absent" ? "bg-accent" : ""}
+                      >
+                        Absent Only
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
             </CardHeader>
             <CardContent className="p-0 sm:p-6">
               {students.all.length === 0 ? (
@@ -507,6 +722,36 @@ export default function SessionDetailPage() {
                       </span>
                     </p>
                   )}
+                </div>
+              ) : getFilteredStudents().length === 0 ? (
+                <div className="px-6 py-8 text-center">
+                  <Search className="text-muted-foreground/50 mx-auto mb-4 h-12 w-12" />
+                  <p className="text-muted-foreground mb-2">
+                    No students found matching your criteria
+                  </p>
+                  <p className="text-muted-foreground text-sm">
+                    Try adjusting your search or filter settings
+                  </p>
+                  <div className="mt-4 flex justify-center gap-2">
+                    {searchQuery && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSearchQuery("")}
+                      >
+                        Clear search
+                      </Button>
+                    )}
+                    {statusFilter !== "all" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setStatusFilter("all")}
+                      >
+                        Show all students
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <>
@@ -538,24 +783,14 @@ export default function SessionDetailPage() {
                               <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
                                 Location
                               </th>
+                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
+                                Actions
+                              </th>
                             </tr>
                           </thead>
                           <tbody>
-                            {students.all
-                              .sort((a, b) => {
-                                // Sort by attendance status (present first), then by name
-                                if (
-                                  a.attendance_status !== b.attendance_status
-                                ) {
-                                  if (a.attendance_status === "present")
-                                    return -1;
-                                  if (b.attendance_status === "present")
-                                    return 1;
-                                  return 0;
-                                }
-                                return a.name.localeCompare(b.name);
-                              })
-                              .map((student, index) => {
+                            {getFilteredStudents().length > 0 ? (
+                              getFilteredStudents().map((student, index) => {
                                 // Find matching attendance record if exists
                                 const attendanceRecord = attendance.find(
                                   (record) =>
@@ -594,7 +829,7 @@ export default function SessionDetailPage() {
                                     <td className="px-2 py-3 whitespace-nowrap">
                                       <div className="flex items-center gap-1">
                                         {student.attendance_status ===
-                                        "present" ? (
+                                        "present" || student.attendance_status === "manual_present" ? (
                                           <CheckCircle className="h-3 w-3 flex-shrink-0 text-green-500" />
                                         ) : (
                                           <XCircle className="h-3 w-3 flex-shrink-0 text-red-500" />
@@ -618,7 +853,7 @@ export default function SessionDetailPage() {
                                       <Badge
                                         variant={
                                           student.attendance_status ===
-                                          "present"
+                                          "present" || student.attendance_status === "manual_present"
                                             ? "default"
                                             : student.attendance_status ===
                                                 "rejected"
@@ -627,7 +862,9 @@ export default function SessionDetailPage() {
                                         }
                                         className="text-xs"
                                       >
-                                        {student.attendance_status.toUpperCase()}
+                                        {student.attendance_status === "manual_present" 
+                                          ? "MANUAL PRESENT" 
+                                          : student.attendance_status.toUpperCase()}
                                       </Badge>
                                     </td>
                                     <td className="px-2 py-3 whitespace-nowrap">
@@ -675,9 +912,39 @@ export default function SessionDetailPage() {
                                         </p>
                                       </div>
                                     </td>
+                                    <td className="px-2 py-3 whitespace-nowrap">
+                                      {student.attendance_status ===
+                                        "absent" && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() =>
+                                            handleManualAttendance(student)
+                                          }
+                                          className="h-7 w-7 p-0 transition-all duration-200 hover:scale-105"
+                                          title="Mark as present manually"
+                                        >
+                                          <UserCheck className="h-3 w-3" />
+                                        </Button>
+                                      )}
+                                    </td>
                                   </tr>
                                 );
-                              })}
+                              })
+                            ) : (
+                              <tr>
+                                <td
+                                  colSpan={8}
+                                  className="px-4 py-8 text-center"
+                                >
+                                  <p className="text-muted-foreground text-sm">
+                                    {searchQuery || statusFilter !== "all"
+                                      ? "No students found matching your search criteria"
+                                      : "No students enrolled"}
+                                  </p>
+                                </td>
+                              </tr>
+                            )}
                           </tbody>
                         </table>
                       </div>
@@ -711,21 +978,14 @@ export default function SessionDetailPage() {
                             <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
                               Location
                             </th>
+                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
+                              Actions
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
-                          {students.all
-                            .sort((a, b) => {
-                              // Sort by attendance status (present first), then by name
-                              if (a.attendance_status !== b.attendance_status) {
-                                if (a.attendance_status === "present")
-                                  return -1;
-                                if (b.attendance_status === "present") return 1;
-                                return 0;
-                              }
-                              return a.name.localeCompare(b.name);
-                            })
-                            .map((student, index) => {
+                          {getFilteredStudents().length > 0 ? (
+                            getFilteredStudents().map((student, index) => {
                               // Find matching attendance record if exists
                               const attendanceRecord = attendance.find(
                                 (record) =>
@@ -764,7 +1024,7 @@ export default function SessionDetailPage() {
                                   <td className="px-4 py-4">
                                     <div className="flex items-center gap-2">
                                       {student.attendance_status ===
-                                      "present" ? (
+                                      "present" || student.attendance_status === "manual_present" ? (
                                         <CheckCircle className="h-4 w-4 text-green-500" />
                                       ) : (
                                         <XCircle className="h-4 w-4 text-red-500" />
@@ -792,7 +1052,7 @@ export default function SessionDetailPage() {
                                       <Badge
                                         variant={
                                           student.attendance_status ===
-                                          "present"
+                                          "present" || student.attendance_status === "manual_present"
                                             ? "default"
                                             : student.attendance_status ===
                                                 "rejected"
@@ -801,7 +1061,9 @@ export default function SessionDetailPage() {
                                         }
                                         className="text-xs"
                                       >
-                                        {student.attendance_status.toUpperCase()}
+                                        {student.attendance_status === "manual_present" 
+                                          ? "MANUAL PRESENT" 
+                                          : student.attendance_status.toUpperCase()}
                                       </Badge>
                                       {student.reason && (
                                         <p className="text-muted-foreground text-xs italic">
@@ -855,9 +1117,35 @@ export default function SessionDetailPage() {
                                       </p>
                                     </div>
                                   </td>
+                                  <td className="px-4 py-4">
+                                    {student.attendance_status === "absent" && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                          handleManualAttendance(student)
+                                        }
+                                        className="h-8 w-8 p-0 transition-all duration-200 hover:scale-105"
+                                        title="Mark as present manually"
+                                      >
+                                        <UserCheck className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </td>
                                 </tr>
                               );
-                            })}
+                            })
+                          ) : (
+                            <tr>
+                              <td colSpan={8} className="px-4 py-8 text-center">
+                                <p className="text-muted-foreground text-sm">
+                                  {searchQuery || statusFilter !== "all"
+                                    ? "No students found matching your search criteria"
+                                    : "No students enrolled"}
+                                </p>
+                              </td>
+                            </tr>
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -868,6 +1156,20 @@ export default function SessionDetailPage() {
           </Card>
         </div>
       </div>
+
+      {/* Manual Attendance Modal */}
+      <ManualAttendanceModal
+        isOpen={showManualAttendanceModal}
+        onClose={() => {
+          setShowManualAttendanceModal(false);
+          setSelectedStudent(null);
+        }}
+        onSubmit={submitManualAttendance}
+        student={selectedStudent}
+        isLoading={isUpdatingAttendance}
+        sessionCode={session.session_code}
+        courseName={`${session.course_id.course_code} - ${session.course_id.title}`}
+      />
     </DashboardLayout>
   );
 }

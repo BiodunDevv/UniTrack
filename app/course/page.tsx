@@ -325,7 +325,7 @@ export default function CoursesPage() {
               {filteredCourses.map((course, index) => (
                 <Card
                   key={course._id}
-                  className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 cursor-pointer backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:scale-[1.02] hover:shadow-lg"
+                  className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 cursor-pointer backdrop-blur-sm transition-all duration-300 hover:shadow-lg"
                   style={{
                     animationDelay: `${index * 50}ms`,
                     animation: "fadeInUp 0.4s ease-out forwards",
@@ -338,7 +338,7 @@ export default function CoursesPage() {
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="mb-3 flex items-center gap-2">
-                          <div className="bg-primary/10 text-primary group-hover:bg-primary/20 rounded-lg p-2 transition-all duration-500 group-hover:scale-110">
+                          <div className="bg-primary/10 text-primary group-hover:bg-primary/20 rounded-lg p-2 transition-all duration-500">
                             <GraduationCap className="h-4 w-4 group-hover:animate-pulse" />
                           </div>
                           <Badge
@@ -412,24 +412,24 @@ export default function CoursesPage() {
                           View
                         </Button>
                         <Button
-                          variant="outline"
+                          variant="default"
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleEditCourse(course);
                           }}
-                          className="border-border/50 bg-background/50 backdrop-blur-sm transition-all duration-300 hover:bg-orange-600 hover:text-white"
+                          className="border-border/50  backdrop-blur-sm transition-all duration-30"
                         >
                           <Edit className="h-3 w-3" />
                         </Button>
                         <Button
-                          variant="default"
+                          variant="destructive"
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDeleteCourse(course._id, course.title);
                           }}
-                          className="border-red-200backdrop-blur-sm transition-all duration-300 hover:border-red-300 hover:bg-red-100 hover:text-red-700"
+                          className="border-red-200 backdrop-blur-sm transition-all duration-300 hover:border-red-300 hover:bg-red-100 hover:text-red-700"
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>

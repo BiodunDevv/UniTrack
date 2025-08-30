@@ -81,7 +81,10 @@ const ProfilePage = () => {
   // Handle success notifications
   useEffect(() => {
     if (updateSuccess) {
-      toast.success("Profile updated successfully!");
+      toast.success("Profile updated successfully!", {
+        description:
+          "Your changes have been saved and applied across the application.",
+      });
       clearSuccess();
       // Clear password form on successful update
       setPasswordForm({
@@ -109,11 +112,17 @@ const ProfilePage = () => {
     }
 
     setIsUpdatingProfile(true);
+
+    // Optimistically update the auth store immediately for better UX
+    updateUser({ name: profileForm.name });
+
     try {
       await updateProfile({ name: profileForm.name });
-      // Also update the auth store with the new name
-      updateUser({ name: profileForm.name });
     } catch {
+      // If update fails, revert the optimistic update
+      if (profile?.name) {
+        updateUser({ name: profile.name });
+      }
       // Error is handled by the store and useEffect
     } finally {
       setIsUpdatingProfile(false);
@@ -204,6 +213,10 @@ const ProfilePage = () => {
 
     setIsUpdatingProfile(true);
     setIsUpdatingPassword(true);
+
+    // Optimistically update the auth store immediately for better UX
+    updateUser({ name: profileForm.name });
+
     try {
       await updateProfile({
         name: profileForm.name,
@@ -211,9 +224,11 @@ const ProfilePage = () => {
         newPassword: passwordForm.newPassword,
         confirmPassword: passwordForm.confirmPassword,
       });
-      // Also update the auth store with the new name
-      updateUser({ name: profileForm.name });
     } catch {
+      // If update fails, revert the optimistic update
+      if (profile?.name) {
+        updateUser({ name: profile.name });
+      }
       // Error is handled by the store and useEffect
     } finally {
       setIsUpdatingProfile(false);
@@ -289,8 +304,12 @@ const ProfilePage = () => {
                   <User className="text-primary h-8 w-8" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <CardTitle className="text-xl break-words">
-                    {profile?.name || user?.name}
+                  <CardTitle
+                    className={`text-xl break-words transition-all duration-300 ${
+                      isUpdatingProfile ? "text-primary/70" : ""
+                    }`}
+                  >
+                    {user?.name || profile?.name}
                   </CardTitle>
                   <CardDescription className="text-base break-words">
                     {profile?.email || user?.email}
@@ -386,6 +405,13 @@ const ProfilePage = () => {
                       }
                       placeholder="Enter your full name"
                       disabled={isUpdatingProfile}
+                      className={`transition-all duration-300 ${
+                        isUpdatingProfile
+                          ? "border-primary/50 bg-primary/5"
+                          : updateSuccess
+                            ? "border-green-500/50 bg-green-50/50 dark:bg-green-900/10"
+                            : ""
+                      }`}
                     />
                   </div>
                   <div className="space-y-2">
