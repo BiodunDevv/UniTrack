@@ -434,11 +434,11 @@ export default function CourseStudentsPage() {
                 </div>
 
                 {/* Bulk Actions */}
-                {!isLoadingStudents && paginatedStudents.length > 0 && (
+                {!isLoadingStudents && filteredStudents.length > 0 && (
                   <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-4">
                       <span className="text-muted-foreground text-sm">
-                        {selectedStudents.length} of {paginatedStudents.length}{" "}
+                        {selectedStudents.length} of {filteredStudents.length}{" "}
                         selected
                       </span>
                       <Button
@@ -446,17 +446,17 @@ export default function CourseStudentsPage() {
                         size="sm"
                         onClick={() => {
                           if (
-                            selectedStudents.length === paginatedStudents.length
+                            selectedStudents.length === filteredStudents.length
                           ) {
                             setSelectedStudents([]);
                           } else {
                             setSelectedStudents(
-                              paginatedStudents.map((s) => s._id),
+                              filteredStudents.map((s) => s._id),
                             );
                           }
                         }}
                       >
-                        {selectedStudents.length === paginatedStudents.length
+                        {selectedStudents.length === filteredStudents.length
                           ? "Deselect All"
                           : "Select All"}
                       </Button>
@@ -489,13 +489,13 @@ export default function CourseStudentsPage() {
                                     type="checkbox"
                                     checked={
                                       selectedStudents.length ===
-                                        paginatedStudents.length &&
-                                      paginatedStudents.length > 0
+                                        filteredStudents.length &&
+                                      filteredStudents.length > 0
                                     }
                                     onChange={(e) => {
                                       if (e.target.checked) {
                                         setSelectedStudents(
-                                          paginatedStudents.map((s) => s._id),
+                                          filteredStudents.map((s) => s._id),
                                         );
                                       } else {
                                         setSelectedStudents([]);
@@ -596,13 +596,13 @@ export default function CourseStudentsPage() {
                                   type="checkbox"
                                   checked={
                                     selectedStudents.length ===
-                                      paginatedStudents.length &&
-                                    paginatedStudents.length > 0
+                                      filteredStudents.length &&
+                                    filteredStudents.length > 0
                                   }
                                   onChange={(e) => {
                                     if (e.target.checked) {
                                       setSelectedStudents(
-                                        paginatedStudents.map((s) => s._id),
+                                        filteredStudents.map((s) => s._id),
                                       );
                                     } else {
                                       setSelectedStudents([]);

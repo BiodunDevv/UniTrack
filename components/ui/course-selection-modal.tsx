@@ -248,7 +248,7 @@ export function CourseSelectionModal({
                 <h4 className="font-semibold">Selected Course:</h4>
                 <Card className="border-border/50 bg-card/50 hover:border-border hover:bg-card/80 backdrop-blur-sm transition-all duration-300">
                   <CardContent className="p-4">
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <h3 className="font-semibold">
                           {selectedCourseData.title}
@@ -268,11 +268,6 @@ export function CourseSelectionModal({
                           {selectedCourseData.student_count || 0} students
                         </div>
                       </div>
-
-                      <p className="text-muted-foreground text-xs">
-                        Taught by{" "}
-                        {selectedCourseData.teacher_id?.name || "Unknown"}
-                      </p>
                     </div>
                   </CardContent>
                 </Card>

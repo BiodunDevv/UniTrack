@@ -159,8 +159,8 @@ export function StudentShareCourseModal({
                 <CardContent className="p-4 text-center">
                   <BookOpen className="mx-auto mb-2 h-8 w-8 text-orange-600" />
                   <p className="text-sm text-orange-700 dark:text-orange-300">
-                    You don&apos;t have any courses yet. Create a course first to
-                    request students.
+                    You don&apos;t have any courses yet. Create a course first
+                    to request students.
                   </p>
                 </CardContent>
               </Card>
@@ -194,7 +194,8 @@ export function StudentShareCourseModal({
                   ) : (
                     <div className="px-3 py-6 text-center">
                       <p className="text-muted-foreground text-sm">
-                        No courses found matching &quot;{courseSearchQuery}&quot;
+                        No courses found matching &quot;{courseSearchQuery}
+                        &quot;
                       </p>
                       {courseSearchQuery && (
                         <Button
@@ -228,21 +229,6 @@ export function StudentShareCourseModal({
                       <Badge variant="outline">
                         {formatLevel(selectedCourseData.level)}
                       </Badge>
-                    </div>
-
-                    <div className="text-muted-foreground flex items-center gap-4 text-sm">
-                      {selectedCourseData.student_count !== undefined && (
-                        <span>
-                          {selectedCourseData.student_count} students currently
-                          enrolled
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="text-muted-foreground bg-primary/5 rounded p-2 text-xs">
-                      {selectedStudentsCount} student
-                      {selectedStudentsCount !== 1 ? "s" : ""} will be requested
-                      to be added to this course.
                     </div>
                   </div>
                 </CardContent>

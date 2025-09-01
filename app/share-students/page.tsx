@@ -354,7 +354,7 @@ function ShareStudentsContent() {
                 {(summary?.pending_incoming || 0) > 0 && (
                   <Badge
                     variant="destructive"
-                    className="ml-2 h-5 w-5 rounded-full p-0 text-xs"
+                    className="ml-2 flex h-5 w-5 items-center justify-center rounded-full p-0 text-xs"
                   >
                     {summary?.pending_incoming}
                   </Badge>

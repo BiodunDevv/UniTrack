@@ -39,7 +39,6 @@ import { ConfirmationModal } from "@/components/ui/confirmation-modal";
 import { EndSessionModal } from "@/components/ui/end-session-modal";
 import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
-import { ReportDownloadModal } from "@/components/ui/report-download-modal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UpdateCourseModal } from "@/components/ui/update-course-modal";
 import { useAuthStore } from "@/store/auth-store";
@@ -75,6 +74,8 @@ export default function CoursePage() {
     isLoading,
     isEmailingCSV,
     isEmailingPDF,
+    isDownloadingCSV,
+    isDownloadingPDF,
     error,
     getCourse,
     updateCourse,
@@ -117,11 +118,6 @@ export default function CoursePage() {
 
   // Student search state
   const [studentSearchQuery, setStudentSearchQuery] = React.useState("");
-
-  // Report download modal states
-  const [showReportModal, setShowReportModal] = React.useState(false);
-  const [reportType, setReportType] = React.useState<"csv" | "pdf">("csv");
-  const [isReportLoading, setIsReportLoading] = React.useState(false);
 
   // Student removal loading state
   const [removingStudentId, setRemovingStudentId] = React.useState<
@@ -266,48 +262,18 @@ export default function CoursePage() {
     }
   };
 
-  const handleDownloadReport = (format: "csv" | "pdf") => {
-    setReportType(format);
-    setShowReportModal(true);
-  };
-
-  const handleReportDownload = async (startDate: string, endDate: string) => {
-    setIsReportLoading(true);
+  const handleDownloadReport = async (format: "csv" | "pdf") => {
     try {
-      const params = { startDate, endDate };
-
-      if (reportType === "csv") {
-        await downloadCSVReport(courseId, params);
+      if (format === "csv") {
+        await downloadCSVReport(courseId);
         toast.success("CSV report downloaded successfully!");
       } else {
-        await downloadPDFReport(courseId, params);
+        await downloadPDFReport(courseId);
         toast.success("PDF report downloaded successfully!");
       }
     } catch (error) {
-      toast.error(`Failed to download ${reportType.toUpperCase()} report`);
-      throw error;
-    } finally {
-      setIsReportLoading(false);
-    }
-  };
-
-  const handleReportEmail = async (startDate: string, endDate: string) => {
-    setIsReportLoading(true);
-    try {
-      const params = { startDate, endDate };
-
-      if (reportType === "csv") {
-        await emailCSVReport(courseId, params);
-        toast.success("CSV report sent to your email successfully!");
-      } else {
-        await emailPDFReport(courseId, params);
-        toast.success("PDF report sent to your email successfully!");
-      }
-    } catch {
-      toast.error(`Failed to email ${reportType.toUpperCase()} report`);
-      throw new Error(`Failed to email ${reportType.toUpperCase()} report`);
-    } finally {
-      setIsReportLoading(false);
+      toast.error(`Failed to download ${format.toUpperCase()} report`);
+      console.error("Download report error:", error);
     }
   };
 
@@ -316,8 +282,9 @@ export default function CoursePage() {
     try {
       await emailCSVReport(courseId);
       toast.success("CSV report sent to your email successfully!");
-    } catch {
+    } catch (error) {
       toast.error("Failed to email CSV report");
+      console.error("Email CSV report error:", error);
     }
   };
 
@@ -325,8 +292,9 @@ export default function CoursePage() {
     try {
       await emailPDFReport(courseId);
       toast.success("PDF report sent to your email successfully!");
-    } catch {
+    } catch (error) {
       toast.error("Failed to email PDF report");
+      console.error("Email PDF report error:", error);
     }
   };
 
@@ -572,13 +540,19 @@ export default function CoursePage() {
             )}
 
             <Button
-              variant={sessions.some((session) => session.is_active || session.status === "active") ? "destructive" : "default"}
+              variant={
+                sessions.some(
+                  (session) => session.is_active || session.status === "active",
+                )
+                  ? "destructive"
+                  : "default"
+              }
               onClick={() =>
                 router.push(
                   `/session/start?courseId=${courseId}&courseName=${encodeURIComponent(currentCourse?.title || "Course")}`,
                 )
               }
-              className="transition-all duration-300 "
+              className="transition-all duration-300"
               disabled={
                 isLoading ||
                 sessions.some(
@@ -1641,12 +1615,12 @@ export default function CoursePage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Download Reports Section */}
+                  {/* Download & Email Reports Section */}
                   <div>
                     <h3 className="mb-4 text-lg font-semibold">
-                      Download Reports
+                      Get reports via email or directly on here 
                     </h3>
-                    <div className="grid gap-4 sm:grid-cols-3">
+                    <div className="grid gap-4 sm:grid-cols-3 md:grid-cols-4">
                       {/* CSV Report Card */}
                       <Card className="border-border/50 bg-muted/20 hover:bg-muted/40 transition-all duration-300">
                         <CardContent className="p-4">
@@ -1664,8 +1638,13 @@ export default function CoursePage() {
                                 onClick={() => handleDownloadReport("csv")}
                                 size="sm"
                                 className="w-full"
+                                disabled={isDownloadingCSV}
                               >
-                                <Download className="mr-2 h-4 w-4" />
+                                {isDownloadingCSV ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Download className="mr-2 h-4 w-4" />
+                                )}
                                 Download CSV
                               </Button>
                             </div>
@@ -1690,24 +1669,21 @@ export default function CoursePage() {
                                 onClick={() => handleDownloadReport("pdf")}
                                 size="sm"
                                 className="w-full"
+                                disabled={isDownloadingPDF}
                               >
-                                <FileText className="mr-2 h-4 w-4" />
+                                {isDownloadingPDF ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <FileText className="mr-2 h-4 w-4" />
+                                )}
                                 Download PDF
                               </Button>
                             </div>
                           </div>
                         </CardContent>
                       </Card>
-                    </div>
-                  </div>
 
-                  {/* Email Reports Section */}
-                  <div className="border-t pt-6">
-                    <h3 className="mb-4 text-lg font-semibold">
-                      Email Reports
-                    </h3>
-                    <div className="grid gap-4 sm:grid-cols-3">
-                      {/* Email CSV Card */}
+                       {/* Email CSV Card */}
                       <Card className="border-border/50 bg-muted/20 hover:bg-muted/40 transition-all duration-300">
                         <CardContent className="p-4">
                           <div className="flex items-start gap-3">
@@ -1773,6 +1749,16 @@ export default function CoursePage() {
                     </div>
                   </div>
 
+                  {/* Email Reports Section */}
+                  <div className="border-t pt-6">
+                    <h3 className="mb-4 text-lg font-semibold">
+                      Email Reports
+                    </h3>
+                    <div className="grid gap-4 sm:grid-cols-3">
+                     
+                    </div>
+                  </div>
+
                   {/* Report Information */}
                   <div className="border-t pt-6">
                     <div className="bg-muted/30 rounded-lg p-4">
@@ -1819,16 +1805,6 @@ export default function CoursePage() {
         onConfirm={confirmEndSession}
         session={sessionToEnd}
         isLoading={isEndingSession}
-      />
-
-      {/* Report Download Modal */}
-      <ReportDownloadModal
-        isOpen={showReportModal}
-        onClose={() => setShowReportModal(false)}
-        onDownload={handleReportDownload}
-        onEmail={handleReportEmail}
-        type={reportType}
-        isLoading={isReportLoading}
       />
 
       {/* Update Course Modal */}

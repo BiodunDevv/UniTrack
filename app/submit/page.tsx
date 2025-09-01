@@ -2,6 +2,7 @@
 
 import FingerprintJS from "@fingerprintjs/fingerprintjs";
 import {
+  ArrowLeft,
   CheckCircle,
   Clock,
   GraduationCap,
@@ -210,6 +211,7 @@ export default function SubmitAttendancePage() {
   // Manual location refresh
   const refreshLocation = async () => {
     setLocationError(null);
+    setIsLoadingLocation(true);
 
     try {
       const newLocation = await getUserLocation();
@@ -220,6 +222,8 @@ export default function SubmitAttendancePage() {
         error instanceof Error ? error.message : "Failed to get location",
       );
       console.error("📍 Location error:", error);
+    } finally {
+      setIsLoadingLocation(false);
     }
   };
 
@@ -328,9 +332,22 @@ export default function SubmitAttendancePage() {
   return (
     <div className="bg-background min-h-screen">
       {/* Hero Section */}
-      <div className="relative overflow-hidden pt-16 sm:pt-20">
+      <div className="relative overflow-hidden pt-8 sm:pt-12">
         <div className="relative container mx-auto px-4 py-8 sm:py-16">
           <div className="mx-auto max-w-4xl text-center">
+            {/* Back Button */}
+            <div className="mb-6 flex justify-start">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.history.back()}
+                className="hover:bg-accent hover:text-accent-foreground transition-all duration-300"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Dashboard
+              </Button>
+            </div>
+
             {/* Header */}
             <div className="mb-8 space-y-4 sm:mb-12 sm:space-y-6">
               <div className="bg-primary/10 text-primary inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium">
@@ -485,40 +502,52 @@ export default function SubmitAttendancePage() {
                             />
                           </div>
                           <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <p className="text-sm font-medium">Location</p>
-                              {!location && !isLoadingLocation && (
-                                <Button
-                                  onClick={refreshLocation}
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-6 text-xs"
-                                >
-                                  <MapPin className="mr-1 h-3 w-3" />
-                                  Get Location
-                                </Button>
-                              )}
-                              {location && (
-                                <Button
-                                  onClick={refreshLocation}
-                                  disabled={isLoadingLocation}
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-muted-foreground hover:text-foreground h-6 w-6 p-0"
-                                >
-                                  <RefreshCw
-                                    className={`h-3 w-3 ${isLoadingLocation ? "animate-spin" : ""}`}
-                                  />
-                                </Button>
-                              )}
-                            </div>
+                            <p className="text-sm font-medium">
+                              Location Status
+                            </p>
                             {location ? (
                               <div className="text-muted-foreground space-y-1 text-xs">
-                                <p>Lat: {location.lat.toFixed(6)}</p>
-                                <p>Lng: {location.lng.toFixed(6)}</p>
-                                <p>
-                                  Accuracy: {Math.round(location.accuracy)}m
-                                </p>
+                                <div className="flex items-center justify-between">
+                                  <span className="font-medium">
+                                    Coordinates:
+                                  </span>
+                                  <span className="font-mono text-green-600">
+                                    {location.lat.toFixed(6)},{" "}
+                                    {location.lng.toFixed(6)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span>Accuracy:</span>
+                                  <span
+                                    className={`font-medium ${
+                                      location.accuracy <= 10
+                                        ? "text-green-600"
+                                        : location.accuracy <= 50
+                                          ? "text-yellow-600"
+                                          : "text-orange-600"
+                                    }`}
+                                  >
+                                    ±{Math.round(location.accuracy)}m
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span>Quality:</span>
+                                  <span
+                                    className={`text-xs font-medium ${
+                                      location.accuracy <= 10
+                                        ? "text-green-600"
+                                        : location.accuracy <= 50
+                                          ? "text-yellow-600"
+                                          : "text-orange-600"
+                                    }`}
+                                  >
+                                    {location.accuracy <= 10
+                                      ? "Excellent"
+                                      : location.accuracy <= 50
+                                        ? "Good"
+                                        : "Fair"}
+                                  </span>
+                                </div>
                               </div>
                             ) : (
                               <p className="text-muted-foreground text-xs">
@@ -526,13 +555,56 @@ export default function SubmitAttendancePage() {
                                   ? "Getting location..."
                                   : locationError
                                     ? "Location error"
-                                    : "Click to get location"}
+                                    : "Click 'Get Location' below to enable GPS"}
                               </p>
                             )}
                           </div>
                         </div>
                       </CardContent>
                     </Card>
+                  </div>
+
+                  {/* Location Control Buttons */}
+                  <div className="flex gap-3">
+                    {!location ? (
+                      <Button
+                        onClick={refreshLocation}
+                        disabled={isLoadingLocation}
+                        variant="outline"
+                        className="flex-1"
+                      >
+                        {isLoadingLocation ? (
+                          <>
+                            <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                            Getting Location...
+                          </>
+                        ) : (
+                          <>
+                            <MapPin className="mr-2 h-4 w-4" />
+                            Get Location
+                          </>
+                        )}
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={refreshLocation}
+                        disabled={isLoadingLocation}
+                        variant="outline"
+                        className="flex-1"
+                      >
+                        {isLoadingLocation ? (
+                          <>
+                            <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                            Refreshing...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                            Refresh Location
+                          </>
+                        )}
+                      </Button>
+                    )}
                   </div>
 
                   {/* Location Error */}

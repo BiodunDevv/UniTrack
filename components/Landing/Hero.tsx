@@ -37,7 +37,7 @@ export default function Hero({ className }: HeroProps) {
     {
       href: "/auth/signup",
       text: "Sign Up",
-      variant: "glow" as const,
+      variant: "default" as const,
       iconRight: <ArrowRightIcon className="ml-2 size-4" />,
     },
     {
@@ -51,7 +51,7 @@ export default function Hero({ className }: HeroProps) {
   const submitButton = {
     href: "/submit",
     text: "Submit Attendance",
-    variant: "outline" as const,
+    variant: "glow" as const,
     iconRight: <ArrowRightIcon className="ml-2 size-4" />,
   };
 

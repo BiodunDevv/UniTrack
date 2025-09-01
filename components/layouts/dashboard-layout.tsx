@@ -1,9 +1,7 @@
 "use client";
 
 import {
-  Bell,
   ChevronRight,
-  CreditCard,
   HelpCircle,
   LogOut,
   Moon,
@@ -240,20 +238,7 @@ export function DashboardLayout({
                       <User className="mr-3 h-4 w-4" />
                       Profile Settings
                     </Button>
-                    <Button
-                      variant="ghost"
-                      className="hover:bg-accent/50 w-full justify-start transition-colors duration-200"
-                    >
-                      <Bell className="mr-3 h-4 w-4" />
-                      Notifications
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="hover:bg-accent/50 w-full justify-start transition-colors duration-200"
-                    >
-                      <CreditCard className="mr-3 h-4 w-4" />
-                      Billing
-                    </Button>
+
                     <Button
                       variant="ghost"
                       className="hover:bg-accent/50 w-full justify-start transition-colors duration-200"

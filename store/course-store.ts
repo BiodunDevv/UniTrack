@@ -414,6 +414,8 @@ interface CourseState {
   isLoading: boolean;
   isEmailingCSV: boolean;
   isEmailingPDF: boolean;
+  isDownloadingCSV: boolean;
+  isDownloadingPDF: boolean;
   error: string | null;
   currentPage: number;
   coursesPerPage: number;
@@ -526,35 +528,10 @@ interface CourseState {
   // Reports & Analytics Actions
   getCourseStats: (courseId: string) => Promise<void>;
   getCourseAttendanceReport: (courseId: string) => Promise<void>;
-  downloadCSVReport: (
-    courseId: string,
-    params?: {
-      startDate?: string;
-      endDate?: string;
-      status?: string;
-    },
-  ) => Promise<void>;
-  emailCSVReport: (
-    courseId: string,
-    params?: {
-      startDate?: string;
-      endDate?: string;
-    },
-  ) => Promise<void>;
-  downloadPDFReport: (
-    courseId: string,
-    params?: {
-      startDate?: string;
-      endDate?: string;
-    },
-  ) => Promise<void>;
-  emailPDFReport: (
-    courseId: string,
-    params?: {
-      startDate?: string;
-      endDate?: string;
-    },
-  ) => Promise<void>;
+  downloadCSVReport: (courseId: string) => Promise<void>;
+  emailCSVReport: (courseId: string) => Promise<void>;
+  downloadPDFReport: (courseId: string) => Promise<void>;
+  emailPDFReport: (courseId: string) => Promise<void>;
 
   // Utility Actions
   clearError: () => void;
@@ -627,6 +604,8 @@ export const useCourseStore = create<CourseState>()(
       isLoading: false,
       isEmailingCSV: false,
       isEmailingPDF: false,
+      isDownloadingCSV: false,
+      isDownloadingPDF: false,
       error: null,
       currentPage: 1,
       coursesPerPage: 8,
@@ -1460,31 +1439,33 @@ export const useCourseStore = create<CourseState>()(
         }
       },
 
-      downloadCSVReport: async (courseId, params = {}) => {
-        set({ isLoading: true, error: null });
+      downloadCSVReport: async (courseId) => {
+        set({ isDownloadingCSV: true, error: null });
         try {
-          const queryParams = new URLSearchParams(params).toString();
-          const url = `/attendance/course/${courseId}/report.csv${queryParams ? `?${queryParams}` : ""}`;
-
-          const response = await fetch(`${API_BASE_URL}${url}`, {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
+          const token = getAuthToken();
+          const response = await fetch(
+            `${API_BASE_URL}/attendance/course/${courseId}/report.csv`,
+            {
+              headers: {
+                ...(token && { Authorization: `Bearer ${token}` }),
+              },
             },
-          });
+          );
 
           if (response.ok) {
             const blob = await response.blob();
             const downloadUrl = window.URL.createObjectURL(blob);
             const link = document.createElement("a");
             link.href = downloadUrl;
-            link.download = `course-${courseId}-report.csv`;
+            link.download = `comprehensive-attendance-${courseId}-${Date.now()}.csv`;
             document.body.appendChild(link);
             link.click();
             link.remove();
             window.URL.revokeObjectURL(downloadUrl);
-            set({ isLoading: false });
+            set({ isDownloadingCSV: false });
           } else {
-            throw new Error("Failed to download CSV report");
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || "Failed to download CSV report");
           }
         } catch (error) {
           set({
@@ -1492,21 +1473,17 @@ export const useCourseStore = create<CourseState>()(
               error instanceof Error
                 ? error.message
                 : "Failed to download CSV report",
-            isLoading: false,
+            isDownloadingCSV: false,
           });
           throw error;
         }
       },
 
-      emailCSVReport: async (courseId, params = {}) => {
+      emailCSVReport: async (courseId) => {
         set({ isEmailingCSV: true, error: null });
         try {
-          const queryParams = new URLSearchParams({
-            ...params,
-            email: "true",
-          }).toString();
           const response = await apiCall(
-            `/attendance/course/${courseId}/report.csv?${queryParams}`,
+            `/attendance/course/${courseId}/report.csv?email=true`,
           );
 
           if (isSuccessResponse(response)) {
@@ -1526,31 +1503,33 @@ export const useCourseStore = create<CourseState>()(
         }
       },
 
-      downloadPDFReport: async (courseId, params = {}) => {
-        set({ isLoading: true, error: null });
+      downloadPDFReport: async (courseId) => {
+        set({ isDownloadingPDF: true, error: null });
         try {
-          const queryParams = new URLSearchParams(params).toString();
-          const url = `/attendance/course/${courseId}/report.pdf${queryParams ? `?${queryParams}` : ""}`;
-
-          const response = await fetch(`${API_BASE_URL}${url}`, {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
+          const token = getAuthToken();
+          const response = await fetch(
+            `${API_BASE_URL}/attendance/course/${courseId}/report.pdf`,
+            {
+              headers: {
+                ...(token && { Authorization: `Bearer ${token}` }),
+              },
             },
-          });
+          );
 
           if (response.ok) {
             const blob = await response.blob();
             const downloadUrl = window.URL.createObjectURL(blob);
             const link = document.createElement("a");
             link.href = downloadUrl;
-            link.download = `course-${courseId}-report.pdf`;
+            link.download = `comprehensive-attendance-${courseId}-${Date.now()}.pdf`;
             document.body.appendChild(link);
             link.click();
             link.remove();
             window.URL.revokeObjectURL(downloadUrl);
-            set({ isLoading: false });
+            set({ isDownloadingPDF: false });
           } else {
-            throw new Error("Failed to download PDF report");
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || "Failed to download PDF report");
           }
         } catch (error) {
           set({
@@ -1558,21 +1537,17 @@ export const useCourseStore = create<CourseState>()(
               error instanceof Error
                 ? error.message
                 : "Failed to download PDF report",
-            isLoading: false,
+            isDownloadingPDF: false,
           });
           throw error;
         }
       },
 
-      emailPDFReport: async (courseId, params = {}) => {
+      emailPDFReport: async (courseId) => {
         set({ isEmailingPDF: true, error: null });
         try {
-          const queryParams = new URLSearchParams({
-            ...params,
-            email: "true",
-          }).toString();
           const response = await apiCall(
-            `/attendance/course/${courseId}/report.pdf?${queryParams}`,
+            `/attendance/course/${courseId}/report.pdf?email=true`,
           );
 
           if (isSuccessResponse(response)) {

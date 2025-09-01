@@ -1,9 +1,11 @@
 "use client";
 
 import { Separator } from "@radix-ui/react-dropdown-menu";
-import { Menu, Moon, Sun } from "lucide-react";
+import { LogOut, Menu, Moon, Sun } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { ReactNode, useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
@@ -34,8 +36,28 @@ interface NavBarProps {
 export default function NavBar({ className }: NavBarProps) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, logout } = useAuthStore();
   const { theme, setTheme } = useTheme();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    // Close the sidebar first if it's open
+    setIsSidebarOpen(false);
+
+    try {
+      // Show loading toast
+      const loadingToast = toast.loading("Signing out...");
+
+      await logout();
+
+      // Dismiss loading toast and show success
+      toast.dismiss(loadingToast);
+      toast.success("Logged out successfully");
+      router.push("/");
+    } catch {
+      toast.error("Failed to logout");
+    }
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -67,6 +89,17 @@ export default function NavBar({ className }: NavBarProps) {
       href: isAuthenticated ? "/dashboard" : "/auth/signup",
       isButton: true,
     },
+    ...(isAuthenticated
+      ? [
+          {
+            text: "Sign Out",
+            href: "#",
+            variant: "outline" as ButtonProps["variant"],
+            icon: <LogOut className="mr-2 h-4 w-4" />,
+            isButton: true,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -128,19 +161,33 @@ export default function NavBar({ className }: NavBarProps) {
           <div className="flex items-center gap-3">
             {actions.map((action, index) =>
               action.isButton ? (
-                <Button
-                  key={index}
-                  variant={action.variant || "default"}
-                  asChild
-                  className="hidden transition-transform duration-200 hover:scale-105 md:inline-flex"
-                  size="sm"
-                >
-                  <a href={action.href}>
+                action.text === "Sign Out" ? (
+                  <Button
+                    key={index}
+                    variant={action.variant || "default"}
+                    onClick={handleLogout}
+                    className="hidden transition-transform duration-200 hover:scale-105 md:inline-flex"
+                    size="sm"
+                  >
                     {action.icon}
                     {action.text}
                     {action.iconRight}
-                  </a>
-                </Button>
+                  </Button>
+                ) : (
+                  <Button
+                    key={index}
+                    variant={action.variant || "default"}
+                    asChild
+                    className="hidden transition-transform duration-200 hover:scale-105 md:inline-flex"
+                    size="sm"
+                  >
+                    <a href={action.href}>
+                      {action.icon}
+                      {action.text}
+                      {action.iconRight}
+                    </a>
+                  </Button>
+                )
               ) : (
                 <a
                   key={index}
@@ -239,14 +286,25 @@ export default function NavBar({ className }: NavBarProps) {
                         {isAuthenticated ? "Dashboard" : "Get Started"}
                       </a>
                     </Button>
-                    <Button
-                      variant="outline"
-                      asChild
-                      className={`w-full bg-gradient-to-r py-3 text-base shadow-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-xl active:scale-95 ${isAuthenticated ? "hidden" : ""}`}
-                      onClick={handleLinkClick}
-                    >
-                      <a href="/auth/signin">Sign In</a>
-                    </Button>
+                    {isAuthenticated ? (
+                      <Button
+                        variant="destructive"
+                        onClick={handleLogout}
+                        className="w-full py-3 text-base shadow-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-xl active:scale-95"
+                      >
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Sign Out
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        asChild
+                        className="w-full bg-gradient-to-r py-3 text-base shadow-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-xl active:scale-95"
+                        onClick={handleLinkClick}
+                      >
+                        <a href="/auth/signin">Sign In</a>
+                      </Button>
+                    )}
                   </div>
                 </nav>
               </SheetContent>

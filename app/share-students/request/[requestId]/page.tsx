@@ -190,7 +190,7 @@ export default function RequestDetailsPage() {
   if (isLoading) {
     return (
       <DashboardLayout>
-        <div className="flex flex-1 items-center justify-center">
+        <div className="flex min-h-screen flex-1 items-center justify-center">
           <div className="text-center">
             <div className="border-primary mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-b-2"></div>
             <p className="text-muted-foreground">Loading request details...</p>
@@ -233,18 +233,18 @@ export default function RequestDetailsPage() {
             ]}
           />
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => router.push("/share-students")}
+          className="hover:bg-accent hover:text-accent-foreground transition-all duration-300 md:hidden"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Requests
+        </Button>
 
         {/* Header */}
         <div className="animate-appear flex items-center gap-4 opacity-0 delay-100">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => router.push("/share-students")}
-            className="hover:bg-accent hover:text-accent-foreground transition-all duration-300"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Requests
-          </Button>
           <div className="flex-1">
             <h1 className="from-foreground to-muted-foreground bg-gradient-to-r bg-clip-text text-3xl font-bold text-transparent lg:text-4xl">
               Request Details
