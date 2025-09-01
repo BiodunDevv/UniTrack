@@ -40,7 +40,6 @@ import { EndSessionModal } from "@/components/ui/end-session-modal";
 import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
 import { ReportDownloadModal } from "@/components/ui/report-download-modal";
-import { StartSessionModal } from "@/components/ui/start-session-modal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UpdateCourseModal } from "@/components/ui/update-course-modal";
 import { useAuthStore } from "@/store/auth-store";
@@ -78,7 +77,6 @@ export default function CoursePage() {
     isEmailingPDF,
     error,
     getCourse,
-    startAttendanceSession,
     updateCourse,
     removeStudentFromCourse,
     downloadCSVReport,
@@ -90,8 +88,6 @@ export default function CoursePage() {
 
   const { user } = useAuthStore();
   const [activeTab, setActiveTab] = React.useState("overview");
-  const [showStartSessionModal, setShowStartSessionModal] =
-    React.useState(false);
   const [showEndSessionModal, setShowEndSessionModal] = React.useState(false);
   const [sessionToEnd, setSessionToEnd] = React.useState<{
     _id: string;
@@ -113,7 +109,7 @@ export default function CoursePage() {
   } | null>(null);
   const [isEndingSession, setIsEndingSession] = React.useState(false);
   const [currentPage, setCurrentPage] = React.useState(1);
-  const sessionsPerPage = 4;
+  const sessionsPerPage = 10;
 
   // Student pagination state
   const [currentStudentPage, setCurrentStudentPage] = React.useState(1);
@@ -172,38 +168,26 @@ export default function CoursePage() {
     return levelMap[level] || `Level ${level}`;
   };
 
-  const handleStartSession = async (sessionData: {
-    lat: number;
-    lng: number;
-    radius_m: number;
-    duration_minutes: number;
-  }) => {
-    try {
-      // Show loading toast
-      const loadingToast = toast.loading("Starting attendance session...");
+  // Format date with day of week
+  const formatDateWithDay = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
 
-      await startAttendanceSession(courseId, sessionData);
-
-      // Dismiss loading toast and show success
-      toast.dismiss(loadingToast);
-      toast.success("Attendance session started successfully!", {
-        description:
-          "Students can now mark their attendance using the session code.",
-        duration: 4000,
-      });
-
-      // Refresh course data after starting session
-      getCourse(courseId);
-    } catch (error) {
-      console.error("Failed to start session:", error);
-      toast.error("Failed to start session", {
-        description:
-          error instanceof Error
-            ? error.message
-            : "An unexpected error occurred",
-        duration: 4000,
-      });
-    }
+  // Format date and time with day of week
+  const formatDateTimeWithDay = (dateString: string) => {
+    return new Date(dateString).toLocaleString("en-US", {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   const handleEndSession = async (sessionId: string) => {
@@ -548,18 +532,38 @@ export default function CoursePage() {
                   onClick={() => router.push(`/students/${courseId}`)}
                   variant="outline"
                   className="border-border/50 bg-background/50 transition-all duration-300 hover:bg-purple-600 hover:text-white hover:shadow-lg hover:shadow-purple-600/20"
+                  disabled={isLoading}
                 >
                   <Users className="mr-2 h-4 w-4" />
-                  {stats?.total_students === 0 || students.length === 0
-                    ? "Add Students"
-                    : stats?.total_students === 1 || students.length === 1
-                      ? "View Student"
-                      : "View Students"}
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Loading...
+                    </>
+                  ) : stats?.total_students === 0 || students.length === 0 ? (
+                    "Add Students"
+                  ) : stats?.total_students === 1 || students.length === 1 ? (
+                    "View Student"
+                  ) : (
+                    "View Students"
+                  )}
+                </Button>
+                <Button
+                  onClick={() =>
+                    router.push(`/course/report?courseId=${courseId}`)
+                  }
+                  variant="outline"
+                  className="border-border/50 bg-background/50 transition-all duration-300 hover:bg-blue-600 hover:text-white hover:shadow-lg hover:shadow-blue-600/20"
+                  disabled={isLoading}
+                >
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  Attendance Report
                 </Button>
                 <Button
                   onClick={() => setShowUpdateCourseModal(true)}
                   variant="outline"
                   className="border-border/50 bg-background/50 transition-all duration-300 hover:bg-orange-600 hover:text-white hover:shadow-lg hover:shadow-orange-600/20"
+                  disabled={isLoading}
                 >
                   <Edit className="mr-2 h-4 w-4" />
                   Edit Course
@@ -568,18 +572,29 @@ export default function CoursePage() {
             )}
 
             <Button
-              onClick={() => setShowStartSessionModal(true)}
-              className="bg-green-600 transition-all duration-300 hover:bg-green-700 hover:shadow-lg hover:shadow-green-600/20"
-              disabled={sessions.some(
-                (session) => session.is_active || session.status === "active",
-              )}
+              variant={sessions.some((session) => session.is_active || session.status === "active") ? "destructive" : "default"}
+              onClick={() =>
+                router.push(
+                  `/session/start?courseId=${courseId}&courseName=${encodeURIComponent(currentCourse?.title || "Course")}`,
+                )
+              }
+              className="transition-all duration-300 "
+              disabled={
+                isLoading ||
+                sessions.some(
+                  (session) => session.is_active || session.status === "active",
+                )
+              }
             >
               <Play className="mr-2 h-4 w-4" />
-              {sessions.some(
-                (session) => session.is_active || session.status === "active",
-              )
-                ? "Session Active"
-                : "Start Session"}
+              {isLoading
+                ? "Loading..."
+                : sessions.some(
+                      (session) =>
+                        session.is_active || session.status === "active",
+                    )
+                  ? "Session Active"
+                  : "Start Session"}
             </Button>
           </div>
         </div>
@@ -792,13 +807,7 @@ export default function CoursePage() {
                                 Created
                               </p>
                               <p className="text-sm font-medium">
-                                {new Date(
-                                  currentCourse.created_at,
-                                ).toLocaleDateString("en-US", {
-                                  year: "numeric",
-                                  month: "long",
-                                  day: "numeric",
-                                })}
+                                {formatDateWithDay(currentCourse.created_at)}
                               </p>
                             </div>
                           </div>
@@ -817,7 +826,16 @@ export default function CoursePage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="p-0 sm:p-6">
-                    {recentSessions.length > 0 ? (
+                    {isLoading ? (
+                      <div className="flex items-center justify-center p-8">
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="text-muted-foreground text-sm">
+                            Loading recent sessions...
+                          </span>
+                        </div>
+                      </div>
+                    ) : recentSessions.length > 0 ? (
                       <>
                         {/* Mobile Horizontal Scrollable Table */}
                         <div className="block sm:hidden">
@@ -869,10 +887,10 @@ export default function CoursePage() {
                                       </td>
                                       <td className="px-2 py-3 whitespace-nowrap">
                                         <p className="text-muted-foreground text-xs">
-                                          {new Date(
+                                          {formatDateWithDay(
                                             session.start_time ||
                                               session.created_at,
-                                          ).toLocaleDateString()}
+                                          )}
                                         </p>
                                       </td>
                                       <td className="px-2 py-3 whitespace-nowrap">
@@ -946,10 +964,10 @@ export default function CoursePage() {
                                     </td>
                                     <td className="px-4 py-4">
                                       <p className="text-muted-foreground text-sm">
-                                        {new Date(
+                                        {formatDateWithDay(
                                           session.start_time ||
                                             session.created_at,
-                                        ).toLocaleDateString()}
+                                        )}
                                       </p>
                                     </td>
                                     <td className="px-4 py-4">
@@ -1242,14 +1260,18 @@ export default function CoursePage() {
             <TabsContent value="sessions" className="space-y-4">
               <Card className="animate-appear border-border/50 bg-card/50 hover:border-border hover:bg-card/80 backdrop-blur-sm transition-all duration-300">
                 <CardHeader>
-                  <CardTitle>Attendance Sessions</CardTitle>
-                  <CardDescription>
-                    Manage course attendance sessions
-                  </CardDescription>
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <CardTitle>Attendance Sessions</CardTitle>
+                      <CardDescription>
+                        Manage course attendance sessions
+                      </CardDescription>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className="p-0 sm:p-6">
-                  {sessions.length > 0 ? (
-                    <div className="space-y-4">
+                  {paginatedSessions.length > 0 ? (
+                    <>
                       {/* Mobile Horizontal Scrollable Table */}
                       <div className="block sm:hidden">
                         <div className="overflow-x-auto">
@@ -1258,7 +1280,10 @@ export default function CoursePage() {
                               <thead>
                                 <tr className="border-border border-b">
                                   <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
-                                    Session
+                                    #
+                                  </th>
+                                  <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
+                                    Session Code
                                   </th>
                                   <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
                                     Status
@@ -1275,16 +1300,23 @@ export default function CoursePage() {
                                 </tr>
                               </thead>
                               <tbody>
-                                {paginatedSessions.map((session) => (
+                                {paginatedSessions.map((session, index) => (
                                   <tr
                                     key={session._id}
                                     className="border-border/50 hover:bg-muted/50 border-b transition-colors"
                                   >
                                     <td className="px-2 py-3 whitespace-nowrap">
-                                      <p className="text-xs font-medium">
-                                        {session.session_code ||
-                                          session._id.slice(-6)}
-                                      </p>
+                                      <span className="text-xs font-medium">
+                                        #{startIndex + index + 1}
+                                      </span>
+                                    </td>
+                                    <td className="px-2 py-3">
+                                      <div className="min-w-[100px]">
+                                        <p className="truncate text-xs font-medium">
+                                          {session.session_code ||
+                                            session._id.slice(-6)}
+                                        </p>
+                                      </div>
                                     </td>
                                     <td className="px-2 py-3 whitespace-nowrap">
                                       <Badge
@@ -1298,24 +1330,28 @@ export default function CoursePage() {
                                         {session.is_active ? "active" : "ended"}
                                       </Badge>
                                     </td>
-                                    <td className="px-2 py-3 whitespace-nowrap">
-                                      <p className="text-muted-foreground text-xs">
-                                        {new Date(
-                                          session.start_time ||
-                                            session.created_at,
-                                        ).toLocaleDateString()}
-                                      </p>
+                                    <td className="px-2 py-3">
+                                      <div className="min-w-[120px]">
+                                        <p className="text-muted-foreground truncate text-xs">
+                                          {formatDateTimeWithDay(
+                                            session.start_time ||
+                                              session.created_at,
+                                          )}
+                                        </p>
+                                      </div>
+                                    </td>
+                                    <td className="px-2 py-3">
+                                      <div className="min-w-[120px]">
+                                        <p className="text-muted-foreground truncate text-xs">
+                                          {formatDateTimeWithDay(
+                                            session.expiry_time ||
+                                              session.expires_at,
+                                          )}
+                                        </p>
+                                      </div>
                                     </td>
                                     <td className="px-2 py-3 whitespace-nowrap">
-                                      <p className="text-muted-foreground text-xs">
-                                        {new Date(
-                                          session.expiry_time ||
-                                            session.expires_at,
-                                        ).toLocaleDateString()}
-                                      </p>
-                                    </td>
-                                    <td className="px-2 py-3 whitespace-nowrap">
-                                      <div className="flex items-center gap-1">
+                                      <div className="flex gap-1">
                                         {session.is_active && (
                                           <>
                                             <Button
@@ -1326,7 +1362,8 @@ export default function CoursePage() {
                                                   `/session/${session._id}/live`,
                                                 )
                                               }
-                                              className="h-7 w-7 p-0"
+                                              className="h-7 w-7 p-0 transition-all duration-200 hover:scale-105"
+                                              title="View live session"
                                             >
                                               <Activity className="h-3 w-3" />
                                             </Button>
@@ -1337,20 +1374,21 @@ export default function CoursePage() {
                                                 handleEndSession(session._id)
                                               }
                                               className="h-7 w-7 p-0"
+                                              title="End session"
                                             >
                                               <Square className="h-3 w-3" />
                                             </Button>
                                           </>
                                         )}
                                         <Button
-                                          variant="outline"
                                           size="sm"
                                           onClick={() =>
                                             router.push(
                                               `/session/${session._id}`,
                                             )
                                           }
-                                          className="h-7 w-7 p-0"
+                                          className="h-7 w-7 p-0 transition-all duration-200 hover:scale-105"
+                                          title="View session details"
                                         >
                                           <Eye className="h-3 w-3" />
                                         </Button>
@@ -1371,6 +1409,9 @@ export default function CoursePage() {
                             <thead>
                               <tr className="border-border border-b">
                                 <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
+                                  #
+                                </th>
+                                <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
                                   Session Code
                                 </th>
                                 <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
@@ -1388,11 +1429,16 @@ export default function CoursePage() {
                               </tr>
                             </thead>
                             <tbody>
-                              {paginatedSessions.map((session) => (
+                              {paginatedSessions.map((session, index) => (
                                 <tr
                                   key={session._id}
                                   className="border-border/50 hover:bg-muted/50 border-b transition-colors"
                                 >
+                                  <td className="px-4 py-4">
+                                    <span className="text-sm font-medium">
+                                      #{startIndex + index + 1}
+                                    </span>
+                                  </td>
                                   <td className="px-4 py-4">
                                     <p className="text-sm font-medium">
                                       {session.session_code ||
@@ -1413,22 +1459,22 @@ export default function CoursePage() {
                                   </td>
                                   <td className="px-4 py-4">
                                     <p className="text-muted-foreground text-sm">
-                                      {new Date(
+                                      {formatDateTimeWithDay(
                                         session.start_time ||
                                           session.created_at,
-                                      ).toLocaleString()}
+                                      )}
                                     </p>
                                   </td>
                                   <td className="px-4 py-4">
                                     <p className="text-muted-foreground text-sm">
-                                      {new Date(
+                                      {formatDateTimeWithDay(
                                         session.expiry_time ||
                                           session.expires_at,
-                                      ).toLocaleString()}
+                                      )}
                                     </p>
                                   </td>
                                   <td className="px-4 py-4">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex gap-2">
                                       {session.is_active && (
                                         <>
                                           <Button
@@ -1439,6 +1485,8 @@ export default function CoursePage() {
                                                 `/session/${session._id}/live`,
                                               )
                                             }
+                                            className="h-8 w-8 p-0 transition-all duration-200 hover:scale-105"
+                                            title="View live session"
                                           >
                                             <Activity className="h-4 w-4" />
                                           </Button>
@@ -1448,6 +1496,8 @@ export default function CoursePage() {
                                             onClick={() =>
                                               handleEndSession(session._id)
                                             }
+                                            className="h-8 w-8 p-0"
+                                            title="End session"
                                           >
                                             <Square className="h-4 w-4" />
                                           </Button>
@@ -1459,6 +1509,8 @@ export default function CoursePage() {
                                         onClick={() =>
                                           router.push(`/session/${session._id}`)
                                         }
+                                        className="h-8 w-8 p-0 transition-all duration-200 hover:scale-105"
+                                        title="View session details"
                                       >
                                         <Eye className="h-4 w-4" />
                                       </Button>
@@ -1471,38 +1523,16 @@ export default function CoursePage() {
                         </div>
                       </div>
 
-                      {/* Pagination */}
-                      {totalPages > 1 && (
-                        <div className="flex items-center justify-between border-t px-4 pt-4 sm:px-0">
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setCurrentPage(currentPage - 1)}
-                              disabled={currentPage === 1}
-                            >
-                              Previous
-                            </Button>
-                            <span className="text-muted-foreground text-sm">
-                              Page {currentPage} of {totalPages}
-                            </span>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setCurrentPage(currentPage + 1)}
-                              disabled={currentPage === totalPages}
-                            >
-                              Next
-                            </Button>
-                          </div>
-                          <div className="text-muted-foreground text-sm">
-                            Showing {startIndex + 1}-
-                            {Math.min(endIndex, sessions.length)} of{" "}
-                            {sessions.length} sessions
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                      {/* Sessions Pagination */}
+                      <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={setCurrentPage}
+                        totalItems={sessions.length}
+                        itemsPerPage={sessionsPerPage}
+                        itemName="sessions"
+                      />
+                    </>
                   ) : (
                     <div className="px-6 py-8 text-center">
                       <p className="text-muted-foreground text-sm">
@@ -1778,14 +1808,6 @@ export default function CoursePage() {
           </Tabs>
         </div>
       </div>
-
-      {/* Start Session Modal */}
-      <StartSessionModal
-        isOpen={showStartSessionModal}
-        onClose={() => setShowStartSessionModal(false)}
-        onStartSession={handleStartSession}
-        courseName={currentCourse.title}
-      />
 
       {/* End Session Modal */}
       <EndSessionModal

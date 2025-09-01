@@ -31,6 +31,7 @@ import {
 import { Pagination } from "@/components/ui/pagination";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { generateStudentAttendanceReportPDF } from "@/lib/pdf-generator";
 
 // Types
 interface Student {
@@ -238,6 +239,22 @@ export default function StudentAttendancePage() {
     }
   };
 
+  // Handle PDF download
+  const handleDownloadReport = () => {
+    if (!attendanceData) {
+      toast.error("No attendance data available to download");
+      return;
+    }
+
+    try {
+      generateStudentAttendanceReportPDF(attendanceData);
+      toast.success("Student attendance report downloaded successfully!");
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast.error("Failed to generate PDF report");
+    }
+  };
+
   // Pagination logic
   const totalPages = Math.ceil(
     (attendanceData?.attendanceRecords.length || 0) / recordsPerPage,
@@ -250,7 +267,7 @@ export default function StudentAttendancePage() {
   if (isLoading) {
     return (
       <DashboardLayout>
-        <div className="min-h-screen flex flex-1 items-center justify-center">
+        <div className="flex min-h-screen flex-1 items-center justify-center">
           <div className="text-center">
             <div className="border-primary mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-b-2"></div>
             <p className="text-muted-foreground">Loading attendance data...</p>
@@ -324,6 +341,18 @@ export default function StudentAttendancePage() {
                 {student.name} • {course.title}
               </span>
             </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-3">
+            <Button
+              size="sm"
+              onClick={() => handleDownloadReport()}
+              className="hover:bg-primary/90 transition-all duration-300 hover:scale-105"
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              Download Report
+            </Button>
           </div>
         </div>
 
@@ -543,7 +572,7 @@ export default function StudentAttendancePage() {
                                     <td className="px-2 py-3 whitespace-nowrap">
                                       <Badge
                                         variant="outline"
-                                        className={`${getStatusColor(record.status)} flex items-center gap-1 text-xs w-fit`}
+                                        className={`${getStatusColor(record.status)} flex w-fit items-center gap-1 text-xs`}
                                       >
                                         {getStatusIcon(record.status)}
                                         {record.status.charAt(0).toUpperCase() +
@@ -631,7 +660,7 @@ export default function StudentAttendancePage() {
                                   <td className="px-4 py-4">
                                     <Badge
                                       variant="outline"
-                                      className={`${getStatusColor(record.status)} flex items-center gap-1 w-fit`}
+                                      className={`${getStatusColor(record.status)} flex w-fit items-center gap-1`}
                                     >
                                       {getStatusIcon(record.status)}
                                       {record.status.charAt(0).toUpperCase() +
@@ -814,9 +843,9 @@ export default function StudentAttendancePage() {
                           </h4>
                         </div>
                         <p className="mt-2 text-sm text-orange-700 dark:text-orange-300">
-                          This student&apos;s attendance rate is below 75%. Consider
-                          reaching out to discuss any challenges or support
-                          needed.
+                          This student&apos;s attendance rate is below 75%.
+                          Consider reaching out to discuss any challenges or
+                          support needed.
                         </p>
                       </div>
                     </>

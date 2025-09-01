@@ -2,6 +2,7 @@
 
 import {
   Activity,
+  ArrowLeft,
   BookOpen,
   Calendar,
   Clock,
@@ -60,12 +61,22 @@ export default function SessionsPage() {
   const [showCourseSelectionModal, setShowCourseSelectionModal] =
     useState(false);
 
+  // Format date with day of week
+  const formatDateWithDay = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
   // Fetch sessions on component mount
   React.useEffect(() => {
     if (isAuthenticated && !authLoading) {
       getAllSessions(
         currentPage,
-        18,
+        10,
         statusFilter === "all" ? undefined : statusFilter,
       );
     }
@@ -111,17 +122,6 @@ export default function SessionsPage() {
   };
 
   // Handle session started callback
-  const handleSessionStarted = (sessionId: string, courseId: string) => {
-    // Refresh sessions list
-    getAllSessions(
-      currentPage,
-      20,
-      statusFilter === "all" ? undefined : statusFilter,
-    );
-
-    // Navigate to the course page to see the active session
-    router.push(`/course/${courseId}`);
-  };
 
   // Get time-based greeting
   const getGreeting = () => {
@@ -179,6 +179,17 @@ export default function SessionsPage() {
         {/* Header Section */}
         <div className="animate-appear flex flex-col gap-4 opacity-0 delay-100 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => router.push(`/`)}
+                className="hover:bg-accent hover:text-accent-foreground transition-all duration-300 md:hidden"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Home
+              </Button>
+            </div>
             <h1 className="from-foreground to-muted-foreground bg-gradient-to-r bg-clip-text text-3xl font-bold text-transparent lg:text-4xl">
               Session Management
             </h1>
@@ -446,7 +457,7 @@ export default function SessionsPage() {
                             Started
                           </span>
                           <span className="text-xs">
-                            {new Date(session.start_ts).toLocaleDateString()}{" "}
+                            {formatDateWithDay(session.start_ts)}{" "}
                             {new Date(session.start_ts).toLocaleTimeString([], {
                               hour: "2-digit",
                               minute: "2-digit",
@@ -486,7 +497,7 @@ export default function SessionsPage() {
                 totalPages={pagination.total_pages}
                 onPageChange={setCurrentPage}
                 totalItems={pagination.total_items || 0}
-                itemsPerPage={pagination.items_per_page || 20}
+                itemsPerPage={pagination.items_per_page || 10}
                 itemName="sessions"
               />
             )}
@@ -497,7 +508,6 @@ export default function SessionsPage() {
       <CourseSelectionModal
         isOpen={showCourseSelectionModal}
         onClose={() => setShowCourseSelectionModal(false)}
-        onSessionStarted={handleSessionStarted}
       />
     </DashboardLayout>
   );

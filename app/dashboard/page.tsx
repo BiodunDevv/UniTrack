@@ -127,12 +127,6 @@ export default function DashboardPage() {
   const [showCourseSelectionModal, setShowCourseSelectionModal] =
     useState(false);
 
-  // Handle session started callback
-  const handleSessionStarted = (sessionId: string, courseId: string) => {
-    // Navigate to the course page to see the active session
-    router.push(`/course/${courseId}`);
-  };
-
   return (
     <DashboardLayout>
       <div className="space-y-6 p-4 lg:p-6">
@@ -485,7 +479,6 @@ export default function DashboardPage() {
       <CourseSelectionModal
         isOpen={showCourseSelectionModal}
         onClose={() => setShowCourseSelectionModal(false)}
-        onSessionStarted={handleSessionStarted}
       />
     </DashboardLayout>
   );

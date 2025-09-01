@@ -27,7 +27,7 @@ export function Pagination({
   if (totalPages <= 1) return null;
 
   return (
-    <div className="flex flex-col gap-4 border-t px-4 pt-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+    <div className="flex flex-col gap-4 border-t px-4 pt-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 mb-5">
       {/* Mobile pagination */}
       <div className="flex items-center justify-between sm:hidden">
         <Button
@@ -83,7 +83,7 @@ export function Pagination({
       </div>
 
       {/* Items count */}
-      <div className="text-muted-foreground mb-5 text-center text-sm sm:text-left">
+      <div className="text-muted-foreground text-center text-sm sm:text-left">
         Showing {startIndex}-{endIndex} of {totalItems} {itemName}
       </div>
     </div>

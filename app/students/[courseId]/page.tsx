@@ -3,19 +3,16 @@
 import {
   ArrowLeft,
   BookOpen,
-  CheckCircle,
   Copy,
-  Download,
   Eye,
   Loader2,
-  Plus,
   Search,
+  Trash,
   Trash2,
   Upload,
   User,
   Users,
   X,
-  XCircle,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import * as React from "react";
@@ -23,6 +20,10 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
+import {
+  AddSingleStudentSection,
+  BulkStudentUploadSection,
+} from "@/components/StudentsPage";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
@@ -36,1217 +37,9 @@ import {
 import { ConfirmationModal } from "@/components/ui/confirmation-modal";
 import { CopyStudentsModal } from "@/components/ui/copy-students-modal";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Pagination } from "@/components/ui/pagination";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCourseStore } from "@/store/course-store";
-
-interface BulkUploadResponse {
-  message: string;
-  summary: {
-    total_processed: number;
-    added: number;
-    updated: number;
-    skipped: number;
-    errors: number;
-  };
-  results: {
-    added: Array<{
-      index: number;
-      enrollment: {
-        student_id: {
-          matric_no: string;
-          name: string;
-          email: string;
-          level: number;
-        };
-      };
-    }>;
-    updated: Array<{
-      index: number;
-      enrollment: {
-        student_id: {
-          matric_no: string;
-          name: string;
-          email: string;
-        };
-      };
-    }>;
-    skipped: Array<{
-      index: number;
-      reason: string;
-    }>;
-    errors: Array<{
-      index: number;
-      matric_no: string;
-      error: string;
-    }>;
-  };
-}
-
-// Enhanced bulk upload component with proper error handling
-function BulkStudentUploadSection({
-  courseId,
-  courseCode,
-  courseLevel,
-  onUploadComplete,
-  isDisabled = false,
-}: {
-  courseId: string;
-  courseCode: string;
-  courseLevel: number;
-  onUploadComplete: () => void;
-  isDisabled?: boolean;
-}) {
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadResults, setUploadResults] = useState<BulkUploadResponse | null>(
-    null,
-  );
-  const [previewData, setPreviewData] = useState<Array<{
-    matric_no: string;
-    name: string;
-    email: string;
-    level: number;
-    course_code: string;
-  }> | null>(null);
-  const [showPreview, setShowPreview] = useState(false);
-
-  // Upload results pagination
-  const [addedResultsPage, setAddedResultsPage] = useState(1);
-  const [updatedResultsPage, setUpdatedResultsPage] = useState(1);
-  const [skippedResultsPage, setSkippedResultsPage] = useState(1);
-  const [errorResultsPage, setErrorResultsPage] = useState(1);
-  const resultsPerPage = 10;
-
-  const { addBulkStudentsToCourse } = useCourseStore();
-
-  const downloadSampleCSV = () => {
-    const sampleData = [
-      ["matric_no", "name", "email"],
-      ["Bu22csc1001", "John Doe", "john.doe@email.com"],
-      ["Bu22csc1002", "Jane Smith", "jane.smith@email.com"],
-      ["Bu22csc1003", "Bob Johnson", "bob.johnson@email.com"],
-      ["Bu22csc1004", "Alice Brown", "alice.brown@email.com"],
-      ["Bu22csc1005", "Michael Davis", "michael.davis@email.com"],
-      ["Bu22csc1006", "Sarah Wilson", "sarah.wilson@email.com"],
-      ["Bu22csc1007", "David Lee", "david.lee@email.com"],
-      ["Bu22csc1008", "Emily Clark", "emily.clark@email.com"],
-      ["Bu22csc1009", "James Taylor", "james.taylor@email.com"],
-      ["Bu22csc1010", "Olivia Martinez", "olivia.martinez@email.com"],
-    ];
-
-    const csvContent = sampleData.map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${courseCode}_students_template.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.type !== "text/csv" && !file.name.endsWith(".csv")) {
-        toast.error("Please select a CSV file");
-        return;
-      }
-      setUploadResults(null);
-
-      // Parse and show preview
-      try {
-        const text = await file.text();
-        const students = parseCSV(text);
-        setPreviewData(students);
-        setShowPreview(true);
-      } catch (error: unknown) {
-        const errorMessage =
-          error instanceof Error ? error.message : "Failed to parse CSV file";
-        toast.error(errorMessage);
-        setPreviewData(null);
-        setShowPreview(false);
-      }
-    }
-  };
-
-  const parseCSV = (text: string) => {
-    const lines = text.split("\n").filter((line) => line.trim());
-    const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
-
-    const requiredHeaders = ["matric_no", "name", "email"];
-    const missingHeaders = requiredHeaders.filter((h) => !headers.includes(h));
-
-    if (missingHeaders.length > 0) {
-      throw new Error(`Missing required columns: ${missingHeaders.join(", ")}`);
-    }
-
-    const students = [];
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(",").map((v) => v.trim());
-      if (values.length < 3) continue;
-
-      const student = {
-        course_code: courseCode,
-        matric_no: values[headers.indexOf("matric_no")],
-        name: values[headers.indexOf("name")],
-        email: values[headers.indexOf("email")],
-        level: courseLevel, // Use the course level for all students
-      };
-
-      if (!student.matric_no || !student.name || !student.email) {
-        continue;
-      }
-
-      students.push(student);
-    }
-
-    return students;
-  };
-
-  const handleUpload = async () => {
-    if (!previewData || previewData.length === 0) {
-      toast.error("No students to upload");
-      return;
-    }
-
-    setIsUploading(true);
-    setUploadResults(null);
-
-    try {
-      const result = await addBulkStudentsToCourse(courseId, previewData);
-      setUploadResults(result as BulkUploadResponse);
-
-      if (result.summary?.errors === 0) {
-        toast.success(`Successfully added ${result.summary.added} students!`);
-        onUploadComplete();
-        setPreviewData(null);
-        setShowPreview(false);
-      } else {
-        toast.warning(
-          `Upload completed with ${result.summary?.errors} errors. Check details below.`,
-        );
-      }
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to upload students";
-      toast.error(errorMessage);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const removeFromPreview = (index: number) => {
-    if (previewData) {
-      const newPreviewData = previewData.filter((_, i) => i !== index);
-      setPreviewData(newPreviewData);
-      if (newPreviewData.length === 0) {
-        setShowPreview(false);
-      }
-    }
-  };
-
-  const clearPreview = () => {
-    setPreviewData(null);
-    setShowPreview(false);
-  };
-
-  return (
-    <div className="space-y-6">
-      {/* CSV Format Information */}
-      <Card className="border-border/50 bg-muted/20">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">CSV Format Requirements</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-muted-foreground text-sm">
-            Your CSV file must contain the following columns (case-insensitive):
-          </p>
-          <div className="grid grid-cols-1 gap-2 text-sm">
-            <ol className="list-inside list-decimal space-y-1">
-              <li>
-                <span className="font-mono">matric_no</span>
-              </li>
-              <li>
-                <span className="font-mono">name</span>
-              </li>
-              <li>
-                <span className="font-mono">email</span>
-              </li>
-            </ol>
-          </div>
-          <p className="text-muted-foreground text-xs">
-            Note: All students will be automatically assigned to the course
-            level ({courseLevel}).
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={downloadSampleCSV}
-            className="mt-2"
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Download Sample CSV
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* File Upload */}
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="csv-file">Select CSV File</Label>
-          <Input
-            id="csv-file"
-            type="file"
-            accept=".csv"
-            onChange={handleFileChange}
-            className="cursor-pointer"
-          />
-        </div>
-      </div>
-
-      {/* Preview Table */}
-      {showPreview && previewData && previewData.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between text-base">
-              <span>Preview Students ({previewData.length})</span>
-              <Button variant="outline" size="sm" onClick={clearPreview}>
-                <X className="mr-2 h-4 w-4" />
-                Clear
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0 sm:p-6">
-            {/* Mobile Horizontal Scrollable Table */}
-            <div className="block sm:hidden">
-              <div className="overflow-x-auto">
-                <div className="min-w-[600px] px-4">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-border border-b">
-                        <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
-                          #
-                        </th>
-                        <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
-                          Matric No
-                        </th>
-                        <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
-                          Name
-                        </th>
-                        <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
-                          Email
-                        </th>
-                        <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {previewData.map((student, index) => (
-                        <tr
-                          key={`${student.matric_no}-${index}`}
-                          className="border-border/50 hover:bg-muted/50 border-b transition-colors"
-                        >
-                          <td className="px-2 py-3 whitespace-nowrap">
-                            <span className="text-xs font-medium">
-                              #{index + 1}
-                            </span>
-                          </td>
-                          <td className="px-2 py-3">
-                            <div className="min-w-[120px]">
-                              <p className="truncate text-xs font-medium">
-                                {student.matric_no}
-                              </p>
-                            </div>
-                          </td>
-                          <td className="px-2 py-3">
-                            <div className="min-w-[120px]">
-                              <p className="truncate text-xs font-medium">
-                                {student.name}
-                              </p>
-                            </div>
-                          </td>
-                          <td className="px-2 py-3">
-                            <div className="min-w-[150px]">
-                              <p className="text-muted-foreground truncate text-xs">
-                                {student.email}
-                              </p>
-                            </div>
-                          </td>
-                          <td className="px-2 py-3 whitespace-nowrap">
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => removeFromPreview(index)}
-                              className="h-7 w-7 p-0"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            {/* Desktop Table */}
-            <div className="hidden sm:block">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-border border-b">
-                      <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
-                        #
-                      </th>
-                      <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
-                        Matric Number
-                      </th>
-                      <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
-                        Student Name
-                      </th>
-                      <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
-                        Email Address
-                      </th>
-                      <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {previewData.map((student, index) => (
-                      <tr
-                        key={`${student.matric_no}-${index}`}
-                        className="border-border/50 hover:bg-muted/50 border-b transition-colors"
-                      >
-                        <td className="px-4 py-4">
-                          <span className="text-sm font-medium">
-                            #{index + 1}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4">
-                          <p className="text-sm font-medium">
-                            {student.matric_no}
-                          </p>
-                        </td>
-                        <td className="px-4 py-4">
-                          <p className="text-sm font-medium">{student.name}</p>
-                        </td>
-                        <td className="px-4 py-4">
-                          <p className="text-muted-foreground text-sm">
-                            {student.email}
-                          </p>
-                        </td>
-                        <td className="px-4 py-4">
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => removeFromPreview(index)}
-                            className="h-8 w-8 p-0"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Upload Actions */}
-            <div className="flex flex-col gap-2 pt-4 sm:flex-row sm:justify-end">
-              <Button
-                variant="outline"
-                onClick={clearPreview}
-                disabled={isUploading}
-              >
-                <X className="mr-2 h-4 w-4" />
-                Cancel
-              </Button>
-              <Button
-                onClick={handleUpload}
-                disabled={isUploading || isDisabled}
-              >
-                {isUploading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Uploading {previewData.length} Students...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Upload {previewData.length} Students
-                  </>
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Upload Results */}
-      {uploadResults && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Upload Results</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="mb-4 text-sm">
-              <p className="text-muted-foreground">{uploadResults.message}</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="space-y-1">
-                <p>
-                  <strong>Total Processed:</strong>{" "}
-                  {uploadResults.summary.total_processed}
-                </p>
-                <p className="text-green-600">
-                  <strong>Added:</strong> {uploadResults.summary.added}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-blue-600">
-                  <strong>Updated:</strong> {uploadResults.summary.updated}
-                </p>
-                <p className="text-orange-600">
-                  <strong>Skipped:</strong> {uploadResults.summary.skipped}
-                </p>
-                <p className="text-red-600">
-                  <strong>Errors:</strong> {uploadResults.summary.errors}
-                </p>
-              </div>
-            </div>
-
-            {/* Added Students Table */}
-            {uploadResults.results.added &&
-              uploadResults.results.added.length > 0 && (
-                <div className="space-y-4">
-                  <h4 className="flex items-center gap-2 font-medium text-green-600">
-                    <CheckCircle className="h-4 w-4" />
-                    Successfully Added Students (
-                    {uploadResults.results.added.length})
-                  </h4>
-
-                  {/* Mobile Table */}
-                  <div className="block sm:hidden">
-                    <div className="overflow-x-auto">
-                      <div className="min-w-[600px] px-4">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="border-border border-b">
-                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
-                                #
-                              </th>
-                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
-                                Status
-                              </th>
-                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
-                                Matric No
-                              </th>
-                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
-                                Student Name
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {uploadResults.results.added
-                              .slice(
-                                (addedResultsPage - 1) * resultsPerPage,
-                                addedResultsPage * resultsPerPage,
-                              )
-                              .map((result) => (
-                                <tr
-                                  key={result.index}
-                                  className="border-border/50 hover:bg-muted/50 border-b transition-colors"
-                                >
-                                  <td className="px-2 py-3 whitespace-nowrap">
-                                    <span className="text-xs font-medium">
-                                      #{result.index}
-                                    </span>
-                                  </td>
-                                  <td className="px-2 py-3 whitespace-nowrap">
-                                    <div className="flex items-center gap-1">
-                                      <CheckCircle className="h-3 w-3 text-green-600" />
-                                      <span className="text-xs font-medium text-green-600">
-                                        Added
-                                      </span>
-                                    </div>
-                                  </td>
-                                  <td className="px-2 py-3">
-                                    <div className="min-w-[120px]">
-                                      <p className="truncate text-xs font-medium">
-                                        {result.enrollment.student_id.matric_no}
-                                      </p>
-                                    </div>
-                                  </td>
-                                  <td className="px-2 py-3">
-                                    <div className="min-w-[120px]">
-                                      <p className="truncate text-xs font-medium">
-                                        {result.enrollment.student_id.name}
-                                      </p>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Desktop Table */}
-                  <div className="hidden sm:block">
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-border border-b">
-                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
-                              #
-                            </th>
-                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
-                              Status
-                            </th>
-                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
-                              Matric Number
-                            </th>
-                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
-                              Student Name
-                            </th>
-                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
-                              Email Address
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {uploadResults.results.added
-                            .slice(
-                              (addedResultsPage - 1) * resultsPerPage,
-                              addedResultsPage * resultsPerPage,
-                            )
-                            .map((result) => (
-                              <tr
-                                key={result.index}
-                                className="border-border/50 hover:bg-muted/50 border-b transition-colors"
-                              >
-                                <td className="px-4 py-4">
-                                  <span className="text-sm font-medium">
-                                    #{result.index}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-4">
-                                  <div className="flex items-center gap-2">
-                                    <CheckCircle className="h-4 w-4 text-green-600" />
-                                    <span className="text-sm font-medium text-green-600">
-                                      Successfully Added
-                                    </span>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-4">
-                                  <p className="text-sm font-medium">
-                                    {result.enrollment.student_id.matric_no}
-                                  </p>
-                                </td>
-                                <td className="px-4 py-4">
-                                  <p className="text-sm font-medium">
-                                    {result.enrollment.student_id.name}
-                                  </p>
-                                </td>
-                                <td className="px-4 py-4">
-                                  <p className="text-muted-foreground text-sm">
-                                    {result.enrollment.student_id.email}
-                                  </p>
-                                </td>
-                              </tr>
-                            ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Pagination for Added Results */}
-                  {uploadResults.results.added.length > resultsPerPage && (
-                    <Pagination
-                      currentPage={addedResultsPage}
-                      totalPages={Math.ceil(
-                        uploadResults.results.added.length / resultsPerPage,
-                      )}
-                      onPageChange={setAddedResultsPage}
-                      totalItems={uploadResults.results.added.length}
-                      itemsPerPage={resultsPerPage}
-                      itemName="added students"
-                    />
-                  )}
-                </div>
-              )}
-
-            {/* Error Students Table */}
-            {uploadResults.results.errors &&
-              uploadResults.results.errors.length > 0 && (
-                <div className="space-y-4">
-                  <h4 className="flex items-center gap-2 font-medium text-red-600">
-                    <XCircle className="h-4 w-4" />
-                    Errors ({uploadResults.results.errors.length})
-                  </h4>
-
-                  {/* Mobile Table */}
-                  <div className="block sm:hidden">
-                    <div className="overflow-x-auto">
-                      <div className="min-w-[600px] px-4">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="border-border border-b">
-                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
-                                Row
-                              </th>
-                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
-                                Status
-                              </th>
-                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
-                                Matric No
-                              </th>
-                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
-                                Error
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {uploadResults.results.errors
-                              .slice(
-                                (errorResultsPage - 1) * resultsPerPage,
-                                errorResultsPage * resultsPerPage,
-                              )
-                              .map((error, index) => (
-                                <tr
-                                  key={`error-${error.index}-${index}`}
-                                  className="border-border/50 hover:bg-muted/50 border-b transition-colors"
-                                >
-                                  <td className="px-2 py-3 whitespace-nowrap">
-                                    <span className="text-xs font-medium">
-                                      #{error.index}
-                                    </span>
-                                  </td>
-                                  <td className="px-2 py-3 whitespace-nowrap">
-                                    <div className="flex items-center gap-1">
-                                      <XCircle className="h-3 w-3 text-red-600" />
-                                      <span className="text-xs font-medium text-red-600">
-                                        Error
-                                      </span>
-                                    </div>
-                                  </td>
-                                  <td className="px-2 py-3">
-                                    <div className="min-w-[120px]">
-                                      <p className="truncate text-xs font-medium">
-                                        {error.matric_no}
-                                      </p>
-                                    </div>
-                                  </td>
-                                  <td className="px-2 py-3">
-                                    <div className="min-w-[200px]">
-                                      <p className="truncate text-xs text-red-600">
-                                        {error.error}
-                                      </p>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Desktop Table */}
-                  <div className="hidden sm:block">
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-border border-b">
-                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
-                              Row
-                            </th>
-                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
-                              Status
-                            </th>
-                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
-                              Matric Number
-                            </th>
-                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
-                              Error Details
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {uploadResults.results.errors
-                            .slice(
-                              (errorResultsPage - 1) * resultsPerPage,
-                              errorResultsPage * resultsPerPage,
-                            )
-                            .map((error, index) => (
-                              <tr
-                                key={`error-${error.index}-${index}`}
-                                className="border-border/50 hover:bg-muted/50 border-b transition-colors"
-                              >
-                                <td className="px-4 py-4">
-                                  <span className="text-sm font-medium">
-                                    #{error.index}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-4">
-                                  <div className="flex items-center gap-2">
-                                    <XCircle className="h-4 w-4 text-red-600" />
-                                    <span className="text-sm font-medium text-red-600">
-                                      Failed
-                                    </span>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-4">
-                                  <p className="text-sm font-medium">
-                                    {error.matric_no}
-                                  </p>
-                                </td>
-                                <td className="px-4 py-4">
-                                  <p className="text-sm text-red-600">
-                                    {error.error}
-                                  </p>
-                                </td>
-                              </tr>
-                            ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Pagination for Error Results */}
-                  {uploadResults.results.errors.length > resultsPerPage && (
-                    <Pagination
-                      currentPage={errorResultsPage}
-                      totalPages={Math.ceil(
-                        uploadResults.results.errors.length / resultsPerPage,
-                      )}
-                      onPageChange={setErrorResultsPage}
-                      totalItems={uploadResults.results.errors.length}
-                      itemsPerPage={resultsPerPage}
-                      itemName="errors"
-                    />
-                  )}
-                </div>
-              )}
-
-            {/* Updated Students Table */}
-            {uploadResults.results.updated &&
-              uploadResults.results.updated.length > 0 && (
-                <div className="space-y-4">
-                  <h4 className="flex items-center gap-2 font-medium text-blue-600">
-                    <CheckCircle className="h-4 w-4" />
-                    Updated Students ({uploadResults.results.updated.length})
-                  </h4>
-
-                  {/* Mobile Table */}
-                  <div className="block sm:hidden">
-                    <div className="overflow-x-auto">
-                      <div className="min-w-[600px] px-4">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="border-border border-b">
-                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
-                                #
-                              </th>
-                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
-                                Status
-                              </th>
-                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
-                                Student
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {uploadResults.results.updated
-                              .slice(
-                                (updatedResultsPage - 1) * resultsPerPage,
-                                updatedResultsPage * resultsPerPage,
-                              )
-                              .map((result) => (
-                                <tr
-                                  key={result.index}
-                                  className="border-border/50 hover:bg-muted/50 border-b transition-colors"
-                                >
-                                  <td className="px-2 py-3 whitespace-nowrap">
-                                    <span className="text-xs font-medium">
-                                      #{result.index}
-                                    </span>
-                                  </td>
-                                  <td className="px-2 py-3 whitespace-nowrap">
-                                    <div className="flex items-center gap-1">
-                                      <CheckCircle className="h-3 w-3 text-blue-600" />
-                                      <span className="text-xs font-medium text-blue-600">
-                                        Updated
-                                      </span>
-                                    </div>
-                                  </td>
-                                  <td className="px-2 py-3">
-                                    <div className="min-w-[120px]">
-                                      <p className="truncate text-xs font-medium">
-                                        Student #{result.index}
-                                      </p>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Desktop Table */}
-                  <div className="hidden sm:block">
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-border border-b">
-                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
-                              #
-                            </th>
-                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
-                              Status
-                            </th>
-                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
-                              Details
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {uploadResults.results.updated
-                            .slice(
-                              (updatedResultsPage - 1) * resultsPerPage,
-                              updatedResultsPage * resultsPerPage,
-                            )
-                            .map((result) => (
-                              <tr
-                                key={result.index}
-                                className="border-border/50 hover:bg-muted/50 border-b transition-colors"
-                              >
-                                <td className="px-4 py-4">
-                                  <span className="text-sm font-medium">
-                                    #{result.index}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-4">
-                                  <div className="flex items-center gap-2">
-                                    <CheckCircle className="h-4 w-4 text-blue-600" />
-                                    <span className="text-sm font-medium text-blue-600">
-                                      Successfully Updated
-                                    </span>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-4">
-                                  <p className="text-sm">
-                                    Student information updated
-                                  </p>
-                                </td>
-                              </tr>
-                            ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Pagination for Updated Results */}
-                  {uploadResults.results.updated.length > resultsPerPage && (
-                    <Pagination
-                      currentPage={updatedResultsPage}
-                      totalPages={Math.ceil(
-                        uploadResults.results.updated.length / resultsPerPage,
-                      )}
-                      onPageChange={setUpdatedResultsPage}
-                      totalItems={uploadResults.results.updated.length}
-                      itemsPerPage={resultsPerPage}
-                      itemName="updated students"
-                    />
-                  )}
-                </div>
-              )}
-
-            {/* Skipped Students Table */}
-            {uploadResults.results.skipped &&
-              uploadResults.results.skipped.length > 0 && (
-                <div className="space-y-4">
-                  <h4 className="flex items-center gap-2 font-medium text-orange-600">
-                    <XCircle className="h-4 w-4" />
-                    Skipped Students ({uploadResults.results.skipped.length})
-                  </h4>
-
-                  {/* Mobile Table */}
-                  <div className="block sm:hidden">
-                    <div className="overflow-x-auto">
-                      <div className="min-w-[600px] px-4">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="border-border border-b">
-                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
-                                #
-                              </th>
-                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
-                                Status
-                              </th>
-                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
-                                Reason
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {uploadResults.results.skipped
-                              .slice(
-                                (skippedResultsPage - 1) * resultsPerPage,
-                                skippedResultsPage * resultsPerPage,
-                              )
-                              .map((result) => (
-                                <tr
-                                  key={result.index}
-                                  className="border-border/50 hover:bg-muted/50 border-b transition-colors"
-                                >
-                                  <td className="px-2 py-3 whitespace-nowrap">
-                                    <span className="text-xs font-medium">
-                                      #{result.index}
-                                    </span>
-                                  </td>
-                                  <td className="px-2 py-3 whitespace-nowrap">
-                                    <div className="flex items-center gap-1">
-                                      <XCircle className="h-3 w-3 text-orange-600" />
-                                      <span className="text-xs font-medium text-orange-600">
-                                        Skipped
-                                      </span>
-                                    </div>
-                                  </td>
-                                  <td className="px-2 py-3">
-                                    <div className="min-w-[200px]">
-                                      <p className="truncate text-xs text-orange-600">
-                                        {result.reason}
-                                      </p>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Desktop Table */}
-                  <div className="hidden sm:block">
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-border border-b">
-                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
-                              #
-                            </th>
-                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
-                              Status
-                            </th>
-                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
-                              Reason
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {uploadResults.results.skipped
-                            .slice(
-                              (skippedResultsPage - 1) * resultsPerPage,
-                              skippedResultsPage * resultsPerPage,
-                            )
-                            .map((result) => (
-                              <tr
-                                key={result.index}
-                                className="border-border/50 hover:bg-muted/50 border-b transition-colors"
-                              >
-                                <td className="px-4 py-4">
-                                  <span className="text-sm font-medium">
-                                    #{result.index}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-4">
-                                  <div className="flex items-center gap-2">
-                                    <XCircle className="h-4 w-4 text-orange-600" />
-                                    <span className="text-sm font-medium text-orange-600">
-                                      Skipped
-                                    </span>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-4">
-                                  <p className="text-sm text-orange-600">
-                                    {result.reason}
-                                  </p>
-                                </td>
-                              </tr>
-                            ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Pagination for Skipped Results */}
-                  {uploadResults.results.skipped.length > resultsPerPage && (
-                    <Pagination
-                      currentPage={skippedResultsPage}
-                      totalPages={Math.ceil(
-                        uploadResults.results.skipped.length / resultsPerPage,
-                      )}
-                      onPageChange={setSkippedResultsPage}
-                      totalItems={uploadResults.results.skipped.length}
-                      itemsPerPage={resultsPerPage}
-                      itemName="skipped students"
-                    />
-                  )}
-                </div>
-              )}
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-}
-
-// Single student form component
-function AddSingleStudentSection({
-  courseId,
-  courseLevel,
-  onAddComplete,
-  isDisabled = false,
-}: {
-  courseId: string;
-  courseLevel: number;
-  onAddComplete: () => void;
-  isDisabled?: boolean;
-}) {
-  const [formData, setFormData] = useState({
-    matric_no: "",
-    name: "",
-    email: "",
-  });
-  const [isAdding, setIsAdding] = useState(false);
-  const { addStudentToCourse } = useCourseStore();
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (
-      !formData.matric_no.trim() ||
-      !formData.name.trim() ||
-      !formData.email.trim()
-    ) {
-      toast.error("Please fill in all required fields");
-      return;
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      toast.error("Please enter a valid email address");
-      return;
-    }
-
-    setIsAdding(true);
-    try {
-      await addStudentToCourse(courseId, {
-        matric_no: formData.matric_no.trim(),
-        name: formData.name.trim(),
-        email: formData.email.trim(),
-        level: courseLevel,
-      });
-
-      toast.success("Student added successfully!");
-      setFormData({ matric_no: "", name: "", email: "" });
-      onAddComplete();
-    } catch {
-      toast.error("Failed to add student");
-    } finally {
-      setIsAdding(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="matric_no">Matriculation Number *</Label>
-        <Input
-          id="matric_no"
-          name="matric_no"
-          type="text"
-          placeholder="e.g., CSC/2024/001"
-          value={formData.matric_no}
-          onChange={handleInputChange}
-          required
-          className="font-mono"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="name">Full Name *</Label>
-        <Input
-          id="name"
-          name="name"
-          type="text"
-          placeholder="e.g., John Doe"
-          value={formData.name}
-          onChange={handleInputChange}
-          required
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="email">Email Address *</Label>
-        <Input
-          id="email"
-          name="email"
-          type="email"
-          placeholder="e.g., john.doe@email.com"
-          value={formData.email}
-          onChange={handleInputChange}
-          required
-        />
-      </div>
-
-      <div className="border-border/50 bg-muted/20 rounded-md border p-3">
-        <p className="text-muted-foreground text-sm">
-          <strong>Level:</strong> {courseLevel} (inherited from course)
-        </p>
-      </div>
-
-      <Button
-        type="submit"
-        disabled={isAdding || isDisabled}
-        className="w-full"
-      >
-        {isAdding ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Adding Student...
-          </>
-        ) : (
-          <>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Student
-          </>
-        )}
-      </Button>
-    </form>
-  );
-}
 
 export default function StudentsPage() {
   const params = useParams();
@@ -1261,6 +54,8 @@ export default function StudentsPage() {
     error,
     getCourse,
     removeStudentFromCourse,
+    bulkRemoveStudentsFromCourse,
+    removeAllStudentsFromCourse,
     clearError,
     getAllCourses,
   } = useCourseStore();
@@ -1285,6 +80,12 @@ export default function StudentsPage() {
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Bulk delete state
+  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   // Handle copy completion
   const handleCopyComplete = async () => {
@@ -1369,6 +170,115 @@ export default function StudentsPage() {
       await getAllCourses();
     } catch {
       toast.error("Failed to load courses");
+    }
+  };
+
+  // Bulk delete handlers
+  const handleSelectStudent = (studentId: string) => {
+    setSelectedStudents((prev) =>
+      prev.includes(studentId)
+        ? prev.filter((id) => id !== studentId)
+        : [...prev, studentId],
+    );
+  };
+
+  const handleSelectAllStudents = () => {
+    if (selectedStudents.length === filteredStudents.length) {
+      setSelectedStudents([]);
+    } else {
+      setSelectedStudents(filteredStudents.map((student) => student._id));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedStudents.length === 0) return;
+
+    setIsBulkDeleting(true);
+
+    // Show optimistic loading toast
+    const loadingToast = toast.loading(
+      `Removing ${selectedStudents.length} selected student${selectedStudents.length === 1 ? "" : "s"}...`,
+      {
+        description: "This action cannot be undone.",
+      },
+    );
+
+    try {
+      const result = await bulkRemoveStudentsFromCourse(
+        courseId,
+        selectedStudents,
+      );
+      setSelectedStudents([]);
+      setShowBulkDeleteModal(false);
+
+      // Dismiss loading toast and show success
+      toast.dismiss(loadingToast);
+      toast.success(
+        `${result.summary.successful} student${result.summary.successful === 1 ? "" : "s"} removed successfully!`,
+        {
+          description: `The student${result.summary.successful === 1 ? " has" : "s have"} been removed from this course.`,
+          duration: 4000,
+        },
+      );
+
+      // Refresh the course data
+      await getCourse(courseId);
+    } catch (error) {
+      // Dismiss loading toast and show error
+      toast.dismiss(loadingToast);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to bulk delete students";
+      toast.error("Failed to remove students", {
+        description: errorMessage,
+        duration: 4000,
+      });
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    setIsBulkDeleting(true);
+
+    // Show optimistic loading toast
+    const loadingToast = toast.loading(
+      `Removing all ${students.length} students...`,
+      {
+        description: "This action cannot be undone.",
+      },
+    );
+
+    try {
+      const result = await removeAllStudentsFromCourse(courseId);
+      setShowDeleteAllModal(false);
+
+      // Dismiss loading toast and show success
+      toast.dismiss(loadingToast);
+      toast.success(
+        `All ${result.summary.total_students_removed} students removed successfully!`,
+        {
+          description: "All students have been removed from this course.",
+          duration: 4000,
+        },
+      );
+
+      // Refresh the course data
+      await getCourse(courseId);
+    } catch (error) {
+      // Dismiss loading toast and show error
+      toast.dismiss(loadingToast);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to delete all students";
+      toast.error("Failed to remove all students", {
+        description: errorMessage,
+        duration: 4000,
+      });
+    } finally {
+      setIsBulkDeleting(false);
     }
   };
 
@@ -1540,7 +450,7 @@ export default function StudentsPage() {
         <div className="animate-appear opacity-0 delay-400">
           {/* Active Session Warning */}
           {hasActiveSession && (
-            <Card className="group border-border/50 bg-card/50 hover:bg-card/80 hover:shadow-primary/5 backdrop-blur-sm transition-all duration-500 lg:col-span-2 xl:col-span-2">
+            <Card className="group border-border/50 bg-card/50 hover:bg-card/80 hover:shadow-primary/5 mb-2 backdrop-blur-sm transition-all duration-500 lg:col-span-2 xl:col-span-2">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
                   <BookOpen className="h-5 w-5" />
@@ -1613,9 +523,63 @@ export default function StudentsPage() {
                       )}
                     </div>
                   </div>
+
+                  {/* Bulk Actions */}
+                  {!hasActiveSession &&
+                    !isLoading &&
+                    filteredStudents.length > 0 && (
+                      <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-4">
+                          <span className="text-muted-foreground text-sm">
+                            {selectedStudents.length} of{" "}
+                            {filteredStudents.length} selected
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleSelectAllStudents}
+                          >
+                            {selectedStudents.length === filteredStudents.length
+                              ? "Deselect All"
+                              : "Select All"}
+                          </Button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => setShowBulkDeleteModal(true)}
+                            disabled={
+                              selectedStudents.length === 0 || isBulkDeleting
+                            }
+                          >
+                            <Trash className="mr-2 h-4 w-4" />
+                            Delete Selected ({selectedStudents.length})
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => setShowDeleteAllModal(true)}
+                            disabled={isBulkDeleting}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete All
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                 </CardHeader>
                 <CardContent className="p-0 sm:p-6">
-                  {filteredStudents.length > 0 ? (
+                  {isLoading && students.length === 0 ? (
+                    <div className="px-6 py-12 text-center">
+                      <div className="flex flex-col items-center justify-center space-y-4">
+                        <div className="border-primary mx-auto h-8 w-8 animate-spin rounded-full border-b-2"></div>
+                        <p className="text-muted-foreground text-sm">
+                          Loading students...
+                        </p>
+                      </div>
+                    </div>
+                  ) : filteredStudents.length > 0 ? (
                     <>
                       {/* Mobile Horizontal Scrollable Table */}
                       <div className="block sm:hidden">
@@ -1624,6 +588,20 @@ export default function StudentsPage() {
                             <table className="w-full">
                               <thead>
                                 <tr className="border-border border-b">
+                                  {!hasActiveSession && (
+                                    <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
+                                      <input
+                                        type="checkbox"
+                                        checked={
+                                          selectedStudents.length ===
+                                            filteredStudents.length &&
+                                          filteredStudents.length > 0
+                                        }
+                                        onChange={handleSelectAllStudents}
+                                        className="rounded border-gray-300"
+                                      />
+                                    </th>
+                                  )}
                                   <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
                                     #
                                   </th>
@@ -1651,6 +629,20 @@ export default function StudentsPage() {
                                         : ""
                                     }`}
                                   >
+                                    {!hasActiveSession && (
+                                      <td className="px-2 py-3 whitespace-nowrap">
+                                        <input
+                                          type="checkbox"
+                                          checked={selectedStudents.includes(
+                                            student._id,
+                                          )}
+                                          onChange={() =>
+                                            handleSelectStudent(student._id)
+                                          }
+                                          className="rounded border-gray-300"
+                                        />
+                                      </td>
+                                    )}
                                     <td className="px-2 py-3 whitespace-nowrap">
                                       <span className="text-xs font-medium">
                                         #{startIndex + index + 1}
@@ -1689,28 +681,31 @@ export default function StudentsPage() {
                                         >
                                           <Eye className="h-3 w-3" />
                                         </Button>
-                                        <Button
-                                          variant="destructive"
-                                          size="sm"
-                                          onClick={() =>
-                                            handleRemoveStudent(student._id)
-                                          }
-                                          disabled={
-                                            removingStudentId === student._id
-                                          }
-                                          className="h-7 w-7 p-0 transition-all duration-200 hover:scale-105"
-                                          title={
-                                            removingStudentId === student._id
-                                              ? "Removing student..."
-                                              : "Remove student from course"
-                                          }
-                                        >
-                                          {removingStudentId === student._id ? (
-                                            <Loader2 className="h-3 w-3 animate-spin" />
-                                          ) : (
-                                            <Trash2 className="h-3 w-3" />
-                                          )}
-                                        </Button>
+                                        {!hasActiveSession && (
+                                          <Button
+                                            variant="destructive"
+                                            size="sm"
+                                            onClick={() =>
+                                              handleRemoveStudent(student._id)
+                                            }
+                                            disabled={
+                                              removingStudentId === student._id
+                                            }
+                                            className="h-7 w-7 p-0 transition-all duration-200 hover:scale-105"
+                                            title={
+                                              removingStudentId === student._id
+                                                ? "Removing student..."
+                                                : "Remove student from course"
+                                            }
+                                          >
+                                            {removingStudentId ===
+                                            student._id ? (
+                                              <Loader2 className="h-3 w-3 animate-spin" />
+                                            ) : (
+                                              <Trash2 className="h-3 w-3" />
+                                            )}
+                                          </Button>
+                                        )}
                                       </div>
                                     </td>
                                   </tr>
@@ -1727,6 +722,28 @@ export default function StudentsPage() {
                           <table className="w-full">
                             <thead>
                               <tr className="border-border border-b">
+                                {!hasActiveSession && (
+                                  <th className="text-muted-foreground w-12 px-4 py-3 text-left text-sm font-medium">
+                                    <input
+                                      type="checkbox"
+                                      checked={
+                                        selectedStudents.length ===
+                                          filteredStudents.length &&
+                                        filteredStudents.length > 0
+                                      }
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setSelectedStudents(
+                                            filteredStudents.map((s) => s._id),
+                                          );
+                                        } else {
+                                          setSelectedStudents([]);
+                                        }
+                                      }}
+                                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    />
+                                  </th>
+                                )}
                                 <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
                                   #
                                 </th>
@@ -1754,6 +771,31 @@ export default function StudentsPage() {
                                       : ""
                                   }`}
                                 >
+                                  {!hasActiveSession && (
+                                    <td className="px-4 py-4">
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedStudents.includes(
+                                          student._id,
+                                        )}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            setSelectedStudents((prev) => [
+                                              ...prev,
+                                              student._id,
+                                            ]);
+                                          } else {
+                                            setSelectedStudents((prev) =>
+                                              prev.filter(
+                                                (id) => id !== student._id,
+                                              ),
+                                            );
+                                          }
+                                        }}
+                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                      />
+                                    </td>
+                                  )}
                                   <td className="px-4 py-4">
                                     <span className="text-sm font-medium">
                                       #{startIndex + index + 1}
@@ -1788,28 +830,30 @@ export default function StudentsPage() {
                                       >
                                         <Eye className="h-4 w-4" />
                                       </Button>
-                                      <Button
-                                        variant="destructive"
-                                        size="sm"
-                                        onClick={() =>
-                                          handleRemoveStudent(student._id)
-                                        }
-                                        disabled={
-                                          removingStudentId === student._id
-                                        }
-                                        className="h-8 w-8 p-0 transition-all duration-200 hover:scale-105"
-                                        title={
-                                          removingStudentId === student._id
-                                            ? "Removing student..."
-                                            : "Remove student from course"
-                                        }
-                                      >
-                                        {removingStudentId === student._id ? (
-                                          <Loader2 className="h-4 w-4 animate-spin" />
-                                        ) : (
-                                          <Trash2 className="h-4 w-4" />
-                                        )}
-                                      </Button>
+                                      {!hasActiveSession && (
+                                        <Button
+                                          variant="destructive"
+                                          size="sm"
+                                          onClick={() =>
+                                            handleRemoveStudent(student._id)
+                                          }
+                                          disabled={
+                                            removingStudentId === student._id
+                                          }
+                                          className="h-8 w-8 p-0 transition-all duration-200 hover:scale-105"
+                                          title={
+                                            removingStudentId === student._id
+                                              ? "Removing student..."
+                                              : "Remove student from course"
+                                          }
+                                        >
+                                          {removingStudentId === student._id ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                          ) : (
+                                            <Trash2 className="h-4 w-4" />
+                                          )}
+                                        </Button>
+                                      )}
                                     </div>
                                   </td>
                                 </tr>
@@ -1946,6 +990,46 @@ The student will need to be re-enrolled manually if needed.`
         onClose={() => setShowCopyDialog(false)}
         currentCourseId={courseId}
         onCopyComplete={handleCopyComplete}
+      />
+
+      {/* Bulk Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showBulkDeleteModal}
+        onClose={() => setShowBulkDeleteModal(false)}
+        onConfirm={handleBulkDelete}
+        title="Remove Selected Students"
+        description={`Are you sure you want to remove ${selectedStudents.length} selected student${selectedStudents.length === 1 ? "" : "s"} from "${currentCourse?.title}"?
+
+This will:
+• Remove the selected students from this course permanently
+• Delete their attendance records for this course
+• Cannot be undone
+
+The students will need to be re-enrolled manually if needed.`}
+        confirmText={`Yes, Remove ${selectedStudents.length} Student${selectedStudents.length === 1 ? "" : "s"}`}
+        cancelText="Cancel"
+        variant="destructive"
+        isLoading={isBulkDeleting}
+      />
+
+      {/* Delete All Students Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteAllModal}
+        onClose={() => setShowDeleteAllModal(false)}
+        onConfirm={handleDeleteAll}
+        title="Remove All Students"
+        description={`Are you sure you want to remove ALL ${students.length} students from "${currentCourse?.title}"?
+
+This will:
+• Remove ALL students from this course permanently
+• Delete ALL attendance records for this course
+• Cannot be undone
+
+This is a DESTRUCTIVE action that will completely empty the course.`}
+        confirmText={`Yes, Remove All ${students.length} Students`}
+        cancelText="Cancel"
+        variant="destructive"
+        isLoading={isBulkDeleting}
       />
     </DashboardLayout>
   );

@@ -173,6 +173,233 @@ interface ApiResponse<T = any> {
   [key: string]: any;
 }
 
+interface BulkDeleteResponse {
+  message: string;
+  summary: {
+    total_processed: number;
+    successful: number;
+    not_found: number;
+    failed: number;
+    course: {
+      id: string;
+      title: string;
+      course_code: string;
+    };
+  };
+  results: {
+    successful: Array<{
+      student_id: string;
+      name: string;
+      email: string;
+      matric_no: string;
+      attendance_records_cleaned: boolean;
+    }>;
+    not_found: Array<{
+      student_id: string;
+      reason: string;
+    }>;
+    failed: Array<{
+      student_id: string;
+      error: string;
+    }>;
+  };
+}
+
+interface DeleteAllStudentsResponse {
+  message: string;
+  summary: {
+    total_students_removed: number;
+    course: {
+      id: string;
+      title: string;
+      course_code: string;
+    };
+    deleted_students: Array<{
+      id: string;
+      name: string;
+      email: string;
+      matric_no: string;
+    }>;
+    attendance_records_cleaned: boolean;
+  };
+}
+
+interface BulkAttendanceResponse {
+  message: string;
+  summary: {
+    total_processed: number;
+    successful: number;
+    failed: number;
+    skipped: number;
+  };
+  results: {
+    successful: Array<{
+      student_id: string;
+      matric_no: string;
+      name: string;
+      status: "present" | "absent";
+      attendance_id: string;
+    }>;
+    failed: Array<{
+      student_id: string;
+      error: string;
+    }>;
+    skipped: Array<{
+      student_id: string;
+      reason: string;
+    }>;
+  };
+  session: {
+    id: string;
+    session_code: string;
+  };
+  course: {
+    id: string;
+    title: string;
+    course_code: string;
+  };
+}
+
+interface ManualAttendanceResponse {
+  message: string;
+  student: {
+    id: string;
+    matric_no: string;
+    name: string;
+    status: "manual_present";
+    attendance_id: string;
+  };
+  session: {
+    id: string;
+    session_code: string;
+  };
+  course: {
+    id: string;
+    title: string;
+    course_code: string;
+  };
+}
+
+interface AttendanceReportData {
+  message: string;
+  course: {
+    id: string;
+    title: string;
+    course_code: string;
+    level: number;
+    created_at: string;
+  };
+  summary: {
+    total_sessions: number;
+    total_students: number;
+    overall_attendance_rate: number;
+    students_meeting_75_percent: number;
+    students_below_75_percent: number;
+    perfect_attendance_students: number;
+  };
+  risk_analysis: {
+    critical_risk: number;
+    high_risk: number;
+    medium_risk: number;
+    total_at_risk: number;
+  };
+  insights: {
+    best_attended_session: {
+      session_id: string;
+      session_code: string;
+      date: string;
+      start_time: string;
+      end_time: string;
+      total_submissions: number;
+      present_count: number;
+      absent_count: number;
+      attendance_rate: number;
+      location: {
+        lat: number;
+        lng: number;
+        radius_m: number;
+      };
+    };
+    worst_attended_session: {
+      session_id: string;
+      session_code: string;
+      date: string;
+      start_time: string;
+      end_time: string;
+      total_submissions: number;
+      present_count: number;
+      absent_count: number;
+      attendance_rate: number;
+      location: {
+        lat: number;
+        lng: number;
+        radius_m: number;
+      };
+    };
+    average_session_attendance: number;
+    students_with_perfect_attendance: number;
+    students_at_risk: number;
+  };
+  sessions_overview: Array<{
+    session_id: string;
+    session_code: string;
+    date: string;
+    start_time: string;
+    end_time: string;
+    total_submissions: number;
+    present_count: number;
+    absent_count: number;
+    attendance_rate: number;
+    location: {
+      lat: number;
+      lng: number;
+      radius_m: number;
+    };
+  }>;
+  students_below_75_percent: Array<{
+    id: string;
+    name: string;
+    email: string;
+    matric_no: string;
+    level: number;
+    attendance_rate: number;
+    sessions_attended: number;
+    sessions_missed: number;
+    sessions_needed_for_75_percent: number;
+    risk_level: "critical" | "high" | "medium" | "low";
+  }>;
+  all_students: Array<{
+    student: {
+      id: string;
+      name: string;
+      email: string;
+      matric_no: string;
+      level: number;
+    };
+    statistics: {
+      total_sessions: number;
+      attended_sessions: number;
+      missed_sessions: number;
+      attendance_rate: number;
+      meets_75_percent_requirement: boolean;
+      sessions_needed_for_75_percent: number;
+    };
+    session_details: Array<{
+      session_id: string;
+      session_code: string;
+      date: string;
+      status: "present" | "absent" | "rejected";
+      submitted_at: string | null;
+      distance_m: number | null;
+    }>;
+  }>;
+  generated_at: string;
+  report_parameters: {
+    minimum_attendance_requirement: number;
+    format: string;
+  };
+}
+
 interface CourseState {
   // State
   courses: Course[];
@@ -182,6 +409,7 @@ interface CourseState {
   sessions: Session[];
   currentSession: Session | null;
   stats: AttendanceStats | null;
+  attendanceReport: AttendanceReportData | null;
   pagination: Pagination | null;
   isLoading: boolean;
   isEmailingCSV: boolean;
@@ -249,6 +477,13 @@ interface CourseState {
     courseId: string,
     studentId: string,
   ) => Promise<void>;
+  bulkRemoveStudentsFromCourse: (
+    courseId: string,
+    studentIds: string[],
+  ) => Promise<BulkDeleteResponse>;
+  removeAllStudentsFromCourse: (
+    courseId: string,
+  ) => Promise<DeleteAllStudentsResponse>;
 
   // Session Management Actions
   startAttendanceSession: (
@@ -270,8 +505,27 @@ interface CourseState {
   getLiveSessionMonitoring: (sessionId: string) => Promise<void>;
   endSessionEarly: (sessionId: string) => Promise<void>;
 
+  // Attendance Management Actions
+  bulkMarkAttendance: (
+    courseId: string,
+    sessionId: string,
+    students: Array<{
+      studentId: string;
+      status: "present" | "absent";
+      reason: string;
+    }>,
+  ) => Promise<BulkAttendanceResponse>;
+  markStudentAttendance: (
+    courseId: string,
+    sessionId: string,
+    studentId: string,
+    status: "present" | "absent",
+    reason: string,
+  ) => Promise<ManualAttendanceResponse>;
+
   // Reports & Analytics Actions
   getCourseStats: (courseId: string) => Promise<void>;
+  getCourseAttendanceReport: (courseId: string) => Promise<void>;
   downloadCSVReport: (
     courseId: string,
     params?: {
@@ -316,6 +570,7 @@ const isSuccessResponse = (response: ApiResponse): boolean => {
     response.success === true ||
     response.message?.toLowerCase().includes("success") ||
     response.message?.toLowerCase().includes("successful") ||
+    response.message?.toLowerCase().includes("completed") ||
     response.message?.toLowerCase().includes("sent to your email") ||
     Boolean(response.course) || // For single course responses
     Boolean(response.courses) ||
@@ -347,7 +602,9 @@ const apiCall = async <T>(
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(
-      errorData.message || `HTTP error! status: ${response.status}`,
+      errorData.error ||
+        errorData.message ||
+        `HTTP error! status: ${response.status}`,
     );
   }
 
@@ -365,6 +622,7 @@ export const useCourseStore = create<CourseState>()(
       sessions: [],
       currentSession: null,
       stats: null,
+      attendanceReport: null,
       pagination: null,
       isLoading: false,
       isEmailingCSV: false,
@@ -581,7 +839,6 @@ export const useCourseStore = create<CourseState>()(
             method: "POST",
             body: JSON.stringify(studentData),
           });
-
           if (isSuccessResponse(response)) {
             set({ isLoading: false });
             // Refresh students list
@@ -606,6 +863,8 @@ export const useCourseStore = create<CourseState>()(
             method: "POST",
             body: JSON.stringify({ students: studentsData }),
           });
+
+          console.log("Bulk add students response:", response);
 
           if (isSuccessResponse(response) || response.message) {
             set({ isLoading: false });
@@ -677,7 +936,6 @@ export const useCourseStore = create<CourseState>()(
           set({ isLoading: false });
           return responseData as CopyStudentsResponse;
         } catch (error) {
-
           // If it's our custom "no students" case, don't set it as an error
           if (
             error instanceof Error &&
@@ -806,6 +1064,89 @@ export const useCourseStore = create<CourseState>()(
         }
       },
 
+      bulkRemoveStudentsFromCourse: async (courseId, studentIds) => {
+        set({ isLoading: true });
+
+        try {
+          const response = await apiCall(`/courses/${courseId}/students/bulk`, {
+            method: "DELETE",
+            body: JSON.stringify({ student_ids: studentIds }),
+          });
+
+          console.log("Bulk remove students response:", response);
+
+          // Check for bulk delete specific success criteria
+          const isBulkDeleteSuccess =
+            response.summary &&
+            response.results &&
+            response.summary.successful >= 0 && // Allow 0 successful if all were not found/failed
+            typeof response.summary.total_processed === "number";
+
+          if (isSuccessResponse(response) || isBulkDeleteSuccess) {
+            // Remove successfully deleted students from local state
+            const currentStudents = get().students;
+            const deletedStudentIds =
+              response.results?.successful?.map((s: any) => s.student_id) || [];
+            const updatedStudents = currentStudents.filter(
+              (student) => !deletedStudentIds.includes(student._id),
+            );
+            set({ students: updatedStudents });
+
+            return response as BulkDeleteResponse;
+          } else {
+            throw new Error(
+              response.message || "Failed to bulk remove students",
+            );
+          }
+        } catch (error) {
+          set({
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to bulk remove students",
+          });
+          throw error;
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      removeAllStudentsFromCourse: async (courseId) => {
+        set({ isLoading: true });
+
+        try {
+          const response = await apiCall(`/courses/${courseId}/students/all`, {
+            method: "DELETE",
+          });
+
+          // Check for delete all specific success criteria
+          const isDeleteAllSuccess =
+            response.summary &&
+            typeof response.summary.total_students_removed === "number";
+
+          if (isSuccessResponse(response) || isDeleteAllSuccess) {
+            // Clear all students from local state
+            set({ students: [] });
+
+            return response as DeleteAllStudentsResponse;
+          } else {
+            throw new Error(
+              response.message || "Failed to remove all students",
+            );
+          }
+        } catch (error) {
+          set({
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to remove all students",
+          });
+          throw error;
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
       // Session Management Actions
       startAttendanceSession: async (courseId, sessionData) => {
         set({ isLoading: true, error: null });
@@ -814,6 +1155,8 @@ export const useCourseStore = create<CourseState>()(
             method: "POST",
             body: JSON.stringify(sessionData),
           });
+
+          console.log("Start Session Response:", response.message);
 
           if (isSuccessResponse(response)) {
             set({
@@ -947,6 +1290,117 @@ export const useCourseStore = create<CourseState>()(
         }
       },
 
+      // Attendance Management Actions
+      bulkMarkAttendance: async (courseId, sessionId, students) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await apiCall(
+            `/courses/${courseId}/students/bulk-mark`,
+            {
+              method: "PATCH",
+              body: JSON.stringify({
+                sessionId,
+                students,
+              }),
+            },
+          );
+
+          console.log("Bulk mark attendance response:", response);
+
+          // Check for bulk attendance specific success criteria
+          const isBulkAttendanceSuccess =
+            response.summary &&
+            response.results &&
+            typeof response.summary.total_processed === "number" &&
+            typeof response.summary.successful === "number";
+
+          if (isSuccessResponse(response) || isBulkAttendanceSuccess) {
+            set({ isLoading: false });
+            return response as unknown as BulkAttendanceResponse;
+          } else {
+            throw new Error(response.message || "Failed to mark attendance");
+          }
+        } catch (error) {
+          set({
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to mark attendance",
+            isLoading: false,
+          });
+          throw error;
+        }
+      },
+
+      markStudentAttendance: async (
+        courseId,
+        sessionId,
+        studentId,
+        status,
+        reason,
+      ) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await apiCall(
+            `/courses/${courseId}/students/bulk-mark`,
+            {
+              method: "PATCH",
+              body: JSON.stringify({
+                sessionId,
+                students: [
+                  {
+                    studentId,
+                    status,
+                    reason,
+                  },
+                ],
+              }),
+            },
+          );
+
+          console.log("Manual mark attendance response:", response);
+
+          if (isSuccessResponse(response)) {
+            set({ isLoading: false });
+            // Transform bulk response to single manual response format
+            const singleResponse = {
+              message: response.message || `Student marked as ${status}`,
+              student: {
+                id: studentId,
+                matric_no: response.results?.successful?.[0]?.matric_no || "",
+                name: response.results?.successful?.[0]?.name || "",
+                status: status === "present" ? "manual_present" : status,
+                attendance_id:
+                  response.results?.successful?.[0]?.attendance_id || "",
+              },
+              session: {
+                id: response.session?._id || sessionId,
+                session_code: response.session?.session_code || "",
+              },
+              course: {
+                id: response.course?._id || courseId,
+                title: response.course?.title || "",
+                course_code: response.course?.course_code || "",
+              },
+            };
+            return singleResponse as ManualAttendanceResponse;
+          } else {
+            throw new Error(
+              response.message || "Failed to mark student attendance",
+            );
+          }
+        } catch (error) {
+          set({
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to mark student attendance",
+            isLoading: false,
+          });
+          throw error;
+        }
+      },
+
       // Reports & Analytics Actions
       getCourseStats: async (courseId) => {
         set({ isLoading: true, error: null });
@@ -971,6 +1425,35 @@ export const useCourseStore = create<CourseState>()(
               error instanceof Error
                 ? error.message
                 : "Failed to fetch course stats",
+            isLoading: false,
+          });
+          throw error;
+        }
+      },
+
+      getCourseAttendanceReport: async (courseId) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await apiCall(
+            `/courses/${courseId}/attendance-report`,
+          );
+
+          if (isSuccessResponse(response)) {
+            set({
+              attendanceReport: response as unknown as AttendanceReportData,
+              isLoading: false,
+            });
+          } else {
+            throw new Error(
+              response.message || "Failed to fetch attendance report",
+            );
+          }
+        } catch (error) {
+          set({
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to fetch attendance report",
             isLoading: false,
           });
           throw error;

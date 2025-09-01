@@ -1,6 +1,7 @@
 "use client";
 
 import { BookOpen, Clock, Loader2, Play, Search, Users, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -25,26 +26,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./select";
-import { StartSessionModal } from "./start-session-modal";
 
 interface CourseSelectionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSessionStarted?: (sessionId: string, courseId: string) => void;
 }
 
 export function CourseSelectionModal({
   isOpen,
   onClose,
-  onSessionStarted,
 }: CourseSelectionModalProps) {
+  const router = useRouter();
   const [selectedCourse, setSelectedCourse] = React.useState<string>("");
-  const [showStartSessionModal, setShowStartSessionModal] =
-    React.useState(false);
   const [courseSearchQuery, setCourseSearchQuery] = React.useState("");
 
-  const { allCourses, getAllCourses, startAttendanceSession, isLoading } =
-    useCourseStore();
+  const { allCourses, getAllCourses, isLoading } = useCourseStore();
 
   // Fetch courses when modal opens
   React.useEffect(() => {
@@ -57,7 +53,6 @@ export function CourseSelectionModal({
   React.useEffect(() => {
     if (!isOpen) {
       setSelectedCourse("");
-      setShowStartSessionModal(false);
       setCourseSearchQuery("");
     }
   }, [isOpen]);
@@ -99,36 +94,11 @@ export function CourseSelectionModal({
       return;
     }
 
-    setShowStartSessionModal(true);
-  };
-
-  const handleSessionStart = async (sessionData: {
-    lat: number;
-    lng: number;
-    radius_m: number;
-    duration_minutes: number;
-  }) => {
-    if (!selectedCourse) return;
-
-    try {
-      await startAttendanceSession(selectedCourse, sessionData);
-
-      // Close both modals
-      setShowStartSessionModal(false);
-      onClose();
-
-      // Call the callback if provided
-      if (onSessionStarted) {
-        onSessionStarted("", selectedCourse); // Session ID will be available from the store
-      }
-
-      toast.success("Session started successfully!", {
-        description: "Students can now mark their attendance.",
-      });
-    } catch (error) {
-      console.error("Failed to start session:", error);
-      throw error; // Let the StartSessionModal handle the error
-    }
+    // Navigate to start session page
+    router.push(
+      `/session/start?courseId=${selectedCourse}&courseName=${encodeURIComponent(selectedCourseData?.title || "Course")}`,
+    );
+    onClose();
   };
 
   const formatLevel = (level: number) => {
@@ -329,16 +299,6 @@ export function CourseSelectionModal({
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Start Session Modal */}
-      {selectedCourseData && (
-        <StartSessionModal
-          isOpen={showStartSessionModal}
-          onClose={() => setShowStartSessionModal(false)}
-          onStartSession={handleSessionStart}
-          courseName={`${selectedCourseData.course_code} - ${selectedCourseData.title}`}
-        />
-      )}
     </>
   );
 }

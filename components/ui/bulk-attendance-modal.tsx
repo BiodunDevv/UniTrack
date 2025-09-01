@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Loader2, X } from "lucide-react";
+import { Check, Loader2, UserCheck, Users, X } from "lucide-react";
 import * as React from "react";
 
 import { Button } from "./button";
@@ -42,37 +42,39 @@ interface Student {
   has_submitted: boolean;
 }
 
-interface ManualAttendanceModalProps {
+interface BulkAttendanceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (status: "present" | "absent", reason: string) => Promise<void>;
-  student: Student | null;
+  onSubmit: (
+    students: Array<{
+      studentId: string;
+      status: "present" | "absent";
+      reason: string;
+    }>,
+  ) => Promise<void>;
+  selectedStudents: Student[];
   isLoading: boolean;
   sessionCode: string;
   courseName: string;
-  defaultStatus?: "present" | "absent";
 }
 
-export function ManualAttendanceModal({
+export function BulkAttendanceModal({
   isOpen,
   onClose,
   onSubmit,
-  student,
+  selectedStudents,
   isLoading,
   sessionCode,
   courseName,
-  defaultStatus = "present",
-}: ManualAttendanceModalProps) {
-  const [status, setStatus] = React.useState<"present" | "absent">(
-    defaultStatus,
-  );
+}: BulkAttendanceModalProps) {
+  const [status, setStatus] = React.useState<"present" | "absent">("present");
   const [reason, setReason] = React.useState("Network issues");
   const [reasonError, setReasonError] = React.useState<string | null>(null);
 
   const handleSubmit = async () => {
     // Validate reason
     if (!reason.trim()) {
-      setReasonError("Please provide a reason for manual attendance marking");
+      setReasonError("Please provide a reason for bulk attendance marking");
       return;
     }
 
@@ -84,15 +86,21 @@ export function ManualAttendanceModal({
     setReasonError(null);
 
     try {
-      await onSubmit(status, reason.trim());
+      const studentsData = selectedStudents.map((student) => ({
+        studentId: student._id,
+        status,
+        reason: reason.trim(),
+      }));
+
+      await onSubmit(studentsData);
       handleClose();
     } catch (error) {
-      console.error("Failed to submit manual attendance:", error);
+      console.error("Failed to submit bulk attendance:", error);
     }
   };
 
   const handleClose = () => {
-    setStatus(defaultStatus);
+    setStatus("present");
     setReason("Network issues");
     setReasonError(null);
     onClose();
@@ -101,43 +109,54 @@ export function ManualAttendanceModal({
   // Reset state when modal opens
   React.useEffect(() => {
     if (isOpen) {
-      setStatus(defaultStatus);
+      setStatus("present");
       setReason("Network issues");
       setReasonError(null);
     }
-  }, [isOpen, defaultStatus]);
+  }, [isOpen]);
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-h-[95vh] w-[95vw] max-w-md overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-[95vh] w-[95vw] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Mark Student Attendance</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Bulk Mark Attendance
+          </DialogTitle>
           <DialogDescription>
-            Manually update attendance status for a student.
+            Mark attendance for {selectedStudents.length} selected students
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          {/* Student Information */}
-          {student && (
-            <div className="space-y-2">
-              <Label>Student Details</Label>
-              <div className="bg-muted/50 rounded-lg border p-3">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
+        <div className="space-y-6 py-4">
+          {/* Selected Students Preview */}
+          <div className="space-y-2">
+            <Label>Selected Students ({selectedStudents.length})</Label>
+            <div className="bg-muted/20 max-h-32 overflow-y-auto rounded-lg border p-3">
+              <div className="space-y-1">
+                {selectedStudents.slice(0, 5).map((student) => (
+                  <div
+                    key={student._id}
+                    className="flex items-center justify-between text-sm"
+                  >
                     <span className="font-medium">{student.name}</span>
-                    <span className="rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                      Level {student.level}
+                    <span className="text-muted-foreground">
+                      {student.matric_no}
                     </span>
                   </div>
-                </div>
+                ))}
+                {selectedStudents.length > 5 && (
+                  <div className="text-muted-foreground pt-1 text-xs">
+                    ... and {selectedStudents.length - 5} more students
+                  </div>
+                )}
               </div>
             </div>
-          )}
+          </div>
 
           {/* Attendance Status Selection */}
           <div className="space-y-3">
-            <Label>Mark student as</Label>
+            <Label>Mark students as</Label>
             <Select
               value={status}
               onValueChange={(value: string) =>
@@ -167,11 +186,11 @@ export function ManualAttendanceModal({
           {/* Reason Section */}
           <div className="space-y-2">
             <Label htmlFor="reason">
-              Reason for Manual Marking <span className="text-red-500">*</span>
+              Reason for Bulk Marking <span className="text-red-500">*</span>
             </Label>
             <Textarea
               id="reason"
-              placeholder="e.g., Network issue, App crash, Late arrival"
+              placeholder="e.g., Network issues, App crash, Late arrival"
               value={reason}
               onChange={(e) => {
                 setReason(e.target.value);
@@ -186,7 +205,8 @@ export function ManualAttendanceModal({
               </p>
             )}
             <p className="text-muted-foreground text-xs">
-              This reason will be logged for audit purposes.
+              This reason will be logged for all selected students for audit
+              purposes.
             </p>
           </div>
 
@@ -224,16 +244,12 @@ export function ManualAttendanceModal({
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Marking {status}...
+                Marking {selectedStudents.length} Students...
               </>
             ) : (
               <>
-                {status === "present" ? (
-                  <Check className="mr-2 h-4 w-4" />
-                ) : (
-                  <X className="mr-2 h-4 w-4" />
-                )}
-                Mark as {status}
+                <UserCheck className="mr-2 h-4 w-4" />
+                Mark {selectedStudents.length} as {status}
               </>
             )}
           </Button>

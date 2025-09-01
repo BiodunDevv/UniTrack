@@ -23,6 +23,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Glow from "@/components/ui/glow";
+import { NetworkStatus } from "@/components/ui/network-status";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useAuthStore } from "@/store/auth-store";
@@ -71,6 +72,9 @@ export function DashboardLayout({
         variant="above"
         className="animate-appear-zoom fixed -top-32 left-1/2 z-0 -translate-x-1/2 opacity-0 delay-1000 [&>div]:opacity-15 [&>div]:dark:opacity-60"
       />
+
+      {/* Network Status - Only show on protected routes */}
+      <NetworkStatus />
 
       {/* Overlay */}
       {sidebarOpen && (

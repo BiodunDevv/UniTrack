@@ -1,16 +1,18 @@
 "use client";
 
+import FingerprintJS from "@fingerprintjs/fingerprintjs";
 import {
   CheckCircle,
   Clock,
   GraduationCap,
   MapPin,
   Monitor,
+  RefreshCw,
   Shield,
   Smartphone,
   Wifi,
 } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 
 import { AttendanceModal } from "@/components/ui/attendance-modal";
 import { Button } from "@/components/ui/button";
@@ -25,20 +27,25 @@ import Glow from "@/components/ui/glow";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+interface LocationData {
+  lat: number;
+  lng: number;
+  accuracy: number;
+}
+
 interface DeviceInfo {
+  visitorId?: string;
+  visitor_id?: string;
   platform: string;
-  browser: string;
+  browser?: string;
   screen_resolution: string;
   timezone: string;
   user_agent: string;
   language: string;
   device_fingerprint: string;
-}
-
-interface LocationData {
-  lat: number;
-  lng: number;
-  accuracy: number; // Capped at 10000 meters for server validation
+  confidence?: { score: number };
+  components?: Record<string, unknown>;
+  [key: string]: string | number | boolean | object | undefined;
 }
 
 interface SubmissionResult {
@@ -78,84 +85,102 @@ export default function SubmitAttendancePage() {
   const [submissionResult, setSubmissionResult] =
     useState<SubmissionResult | null>(null);
 
-  // Generate device fingerprint
-  const generateDeviceFingerprint = (): string => {
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    if (ctx) {
-      ctx.textBaseline = "top";
-      ctx.font = "14px Arial";
-      ctx.fillText("Device fingerprint", 2, 2);
-    }
+  // Generate device fingerprint using FingerprintJS
+  const generateFingerprint = useCallback(async () => {
+    try {
+      // Load FingerprintJS
+      const fp = await FingerprintJS.load();
+      const result = await fp.get();
 
-    const fingerprint = [
+      // Return the full FingerprintJS result with additional basic info
+      const fingerprintData = {
+        // FingerprintJS core data
+        visitorId: result.visitorId,
+        confidence: result.confidence,
+        components: result.components,
+        version: result.version || "3.x",
+        timestamp: Date.now(),
+
+        // Basic device info for display
+        platform: getPlatform(),
+        browser: getBrowser(),
+        screen_resolution: `${screen.width}x${screen.height}`,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        user_agent: navigator.userAgent,
+        language: navigator.language,
+        device_fingerprint: result.visitorId, // For fallback compatibility
+      };
+
+      setDeviceInfo(fingerprintData);
+    } catch (error) {
+      console.error("Failed to generate fingerprint:", error);
+      const fallbackData = {
+        platform: getPlatform(),
+        browser: getBrowser(),
+        screen_resolution: `${screen.width}x${screen.height}`,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        user_agent: navigator.userAgent,
+        language: navigator.language,
+        device_fingerprint: generateSimpleHash(),
+      };
+      setDeviceInfo(fallbackData);
+    }
+  }, []);
+
+  const getPlatform = (): string => {
+    const userAgent = navigator.userAgent;
+    if (userAgent.includes("Windows")) return "Windows";
+    if (userAgent.includes("Mac")) return "macOS";
+    if (userAgent.includes("Linux")) return "Linux";
+    if (userAgent.includes("Android")) return "Android";
+    if (userAgent.includes("iPhone") || userAgent.includes("iPad"))
+      return "iOS";
+    return "Unknown";
+  };
+
+  const getBrowser = (): string => {
+    const userAgent = navigator.userAgent;
+    if (userAgent.includes("Chrome")) return "Chrome";
+    if (userAgent.includes("Firefox")) return "Firefox";
+    if (userAgent.includes("Safari")) return "Safari";
+    if (userAgent.includes("Edge")) return "Edge";
+    return "Unknown";
+  };
+
+  const generateSimpleHash = (): string => {
+    const data = [
       navigator.userAgent,
       navigator.language,
       screen.width + "x" + screen.height,
       new Date().getTimezoneOffset(),
-      canvas.toDataURL(),
-      navigator.hardwareConcurrency || "unknown",
-      (navigator as unknown as { deviceMemory?: number }).deviceMemory ||
-        "unknown",
     ].join("|");
 
-    // Simple hash function
     let hash = 0;
-    for (let i = 0; i < fingerprint.length; i++) {
-      const char = fingerprint.charCodeAt(i);
+    for (let i = 0; i < data.length; i++) {
+      const char = data.charCodeAt(i);
       hash = (hash << 5) - hash + char;
-      hash = hash & hash; // Convert to 32-bit integer
+      hash = hash & hash;
     }
     return Math.abs(hash).toString(16);
   };
 
-  // Get device information
-  useEffect(() => {
-    const detectBrowser = (): string => {
-      const userAgent = navigator.userAgent;
-      if (userAgent.includes("Chrome")) return "Chrome";
-      if (userAgent.includes("Firefox")) return "Firefox";
-      if (userAgent.includes("Safari")) return "Safari";
-      if (userAgent.includes("Edge")) return "Edge";
-      return "Unknown";
-    };
-
-    const detectPlatform = (): string => {
-      const userAgent = navigator.userAgent;
-      if (userAgent.includes("Windows")) return "Windows";
-      if (userAgent.includes("Mac")) return "macOS";
-      if (userAgent.includes("Linux")) return "Linux";
-      if (userAgent.includes("Android")) return "Android";
-      if (userAgent.includes("iPhone") || userAgent.includes("iPad"))
-        return "iOS";
-      return "Unknown";
-    };
-
-    setDeviceInfo({
-      platform: detectPlatform(),
-      browser: detectBrowser(),
-      screen_resolution: `${screen.width}x${screen.height}`,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      user_agent: navigator.userAgent,
-      language: navigator.language,
-      device_fingerprint: generateDeviceFingerprint(),
-    });
-  }, []);
-
   // Get user location
-  useEffect(() => {
-    if (navigator.geolocation) {
+  const getUserLocation = async (): Promise<LocationData | null> => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("Geolocation is not supported by this browser."));
+        return;
+      }
+
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          // Cap accuracy at 10000 meters to meet server validation requirements
-          const cappedAccuracy = Math.min(position.coords.accuracy, 10000);
-
-          setLocation({
+          const locationData = {
             lat: position.coords.latitude,
             lng: position.coords.longitude,
-            accuracy: cappedAccuracy,
-          });
-          setIsLoadingLocation(false);
+            accuracy: Math.min(position.coords.accuracy, 10000),
+          };
+
+          resolve(locationData);
         },
         (error) => {
           let errorMessage = "Location access denied";
@@ -171,20 +196,45 @@ export default function SubmitAttendancePage() {
               errorMessage = "Location request timed out.";
               break;
           }
-          setLocationError(errorMessage);
-          setIsLoadingLocation(false);
+          reject(new Error(errorMessage));
         },
         {
           enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 300000, // 5 minutes
+          timeout: 15000,
+          maximumAge: 60000,
         },
       );
-    } else {
-      setLocationError("Geolocation is not supported by this browser.");
-      setIsLoadingLocation(false);
+    });
+  };
+
+  // Manual location refresh
+  const refreshLocation = async () => {
+    setLocationError(null);
+
+    try {
+      const newLocation = await getUserLocation();
+      setLocation(newLocation);
+      console.log("📍 Location refreshed:", newLocation);
+    } catch (error) {
+      setLocationError(
+        error instanceof Error ? error.message : "Failed to get location",
+      );
+      console.error("📍 Location error:", error);
     }
-  }, []);
+  };
+
+  // Initialize data on mount (without auto location)
+  useEffect(() => {
+    const initializeData = async () => {
+      // Generate device fingerprint
+      await generateFingerprint();
+
+      // Don't automatically get location - user will click button
+      setIsLoadingLocation(false);
+    };
+
+    initializeData();
+  }, [generateFingerprint]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -228,8 +278,18 @@ export default function SubmitAttendancePage() {
     setIsSubmitting(true);
 
     try {
-      // Ensure accuracy is within server validation limits (0-10000 meters)
-      const validatedAccuracy = Math.min(Math.max(location.accuracy, 0), 10000);
+      // Prepare the exact format the API expects
+      const submissionData = {
+        matric_no: formData.matric_no.toUpperCase(),
+        session_code: formData.session_code,
+        lat: location.lat,
+        lng: location.lng,
+        accuracy: location.accuracy,
+        device_info: deviceInfo, // Send the full FingerprintJS data directly
+        level: parseInt(formData.level),
+      };
+
+      console.log("📤 Submitting attendance with data:", submissionData);
 
       const response = await fetch(`${API_BASE_URL}/attendance/submit`, {
         method: "POST",
@@ -237,36 +297,17 @@ export default function SubmitAttendancePage() {
           "Content-Type": "application/json",
           "User-Agent": navigator.userAgent,
         },
-        body: JSON.stringify({
-          matric_no: formData.matric_no.toUpperCase(),
-          session_code: formData.session_code,
-          lat: location.lat,
-          lng: location.lng,
-          accuracy: validatedAccuracy,
-          level: parseInt(formData.level),
-          device_info: {
-            platform: deviceInfo.platform,
-            browser: deviceInfo.browser,
-            screen_resolution: deviceInfo.screen_resolution,
-            timezone: deviceInfo.timezone,
-            user_agent: deviceInfo.user_agent,
-            language: deviceInfo.language,
-            device_fingerprint: deviceInfo.device_fingerprint,
-          },
-        }),
+        body: JSON.stringify(submissionData),
       });
 
       const result = await response.json();
 
-      console.log("Attendance submission result:", result);
-      console.log("Error details:", result.error);
+      console.log("📥 Attendance submission result:", result);
 
       if (response.ok) {
-        // Success response
         setSubmissionResult(result);
         setFormData({ matric_no: "", session_code: "", level: "" });
       } else {
-        // Error response
         setSubmissionResult(result);
       }
 
@@ -286,7 +327,6 @@ export default function SubmitAttendancePage() {
 
   return (
     <div className="bg-background min-h-screen">
-
       {/* Hero Section */}
       <div className="relative overflow-hidden pt-16 sm:pt-20">
         <div className="relative container mx-auto px-4 py-8 sm:py-16">
@@ -413,7 +453,7 @@ export default function SubmitAttendancePage() {
                             <p className="text-sm font-medium">Device Info</p>
                             <p className="text-muted-foreground text-xs">
                               {deviceInfo
-                                ? `${deviceInfo.browser} on ${deviceInfo.platform}`
+                                ? `${deviceInfo.browser || "Unknown"} on ${deviceInfo.platform || "Unknown"}`
                                 : "Detecting..."}
                             </p>
                           </div>
@@ -445,16 +485,50 @@ export default function SubmitAttendancePage() {
                             />
                           </div>
                           <div className="flex-1">
-                            <p className="text-sm font-medium">Location</p>
-                            <p className="text-muted-foreground text-xs">
-                              {isLoadingLocation
-                                ? "Getting location..."
-                                : location
-                                  ? `Accuracy: ${Math.round(location.accuracy)}m`
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm font-medium">Location</p>
+                              {!location && !isLoadingLocation && (
+                                <Button
+                                  onClick={refreshLocation}
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-6 text-xs"
+                                >
+                                  <MapPin className="mr-1 h-3 w-3" />
+                                  Get Location
+                                </Button>
+                              )}
+                              {location && (
+                                <Button
+                                  onClick={refreshLocation}
+                                  disabled={isLoadingLocation}
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-muted-foreground hover:text-foreground h-6 w-6 p-0"
+                                >
+                                  <RefreshCw
+                                    className={`h-3 w-3 ${isLoadingLocation ? "animate-spin" : ""}`}
+                                  />
+                                </Button>
+                              )}
+                            </div>
+                            {location ? (
+                              <div className="text-muted-foreground space-y-1 text-xs">
+                                <p>Lat: {location.lat.toFixed(6)}</p>
+                                <p>Lng: {location.lng.toFixed(6)}</p>
+                                <p>
+                                  Accuracy: {Math.round(location.accuracy)}m
+                                </p>
+                              </div>
+                            ) : (
+                              <p className="text-muted-foreground text-xs">
+                                {isLoadingLocation
+                                  ? "Getting location..."
                                   : locationError
                                     ? "Location error"
-                                    : "Location required"}
-                            </p>
+                                    : "Click to get location"}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </CardContent>

@@ -13,6 +13,7 @@ import {
   User,
   UserCheck,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -63,6 +64,8 @@ const ProfilePage = () => {
   // Loading states
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+
+  const router = useRouter();
 
   // Load profile on mount
   useEffect(() => {
@@ -274,7 +277,7 @@ const ProfilePage = () => {
           <Breadcrumb items={[{ label: "Profile Settings", current: true }]} />
         </div>
 
-        <Button variant="outline" className="mr-auto md:hidden">
+        <Button variant="outline" className="mr-auto md:hidden" onClick={() => router.back()}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Dashboard
         </Button>

@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { BulkAttendanceModal } from "@/components/ui/bulk-attendance-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -41,6 +42,7 @@ import {
   generateSessionPDF,
   generateSessionSummaryPDF,
 } from "@/lib/pdf-generator";
+import { useCourseStore } from "@/store/course-store";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "localhost:3000";
 
@@ -127,7 +129,7 @@ interface SessionDetailResponse {
     lat: number;
     lng: number;
     accuracy: number;
-    status: "present" | "absent" | "rejected";
+    status: "present" | "absent";
     reason: string;
     receipt_signature: string;
     submitted_at: string;
@@ -161,6 +163,9 @@ export default function SessionDetailPage() {
   const [selectedStudent, setSelectedStudent] = React.useState<Student | null>(
     null,
   );
+  const [manualAttendanceStatus, setManualAttendanceStatus] = React.useState<
+    "present" | "absent"
+  >("present");
   const [isUpdatingAttendance, setIsUpdatingAttendance] = React.useState(false);
 
   // Search and filter state
@@ -168,6 +173,14 @@ export default function SessionDetailPage() {
   const [statusFilter, setStatusFilter] = React.useState<
     "all" | "present" | "absent"
   >("all");
+
+  // Bulk attendance state
+  const [selectedStudents, setSelectedStudents] = React.useState<string[]>([]);
+  const [showBulkAttendanceModal, setShowBulkAttendanceModal] =
+    React.useState(false);
+
+  // Course store
+  const { bulkMarkAttendance, markStudentAttendance } = useCourseStore();
 
   // Fetch session details
   React.useEffect(() => {
@@ -228,8 +241,16 @@ export default function SessionDetailPage() {
     return R * c; // Distance in meters
   };
 
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
+  // Format date and time with day of week
+  const formatDateTimeWithDay = (dateString: string) => {
+    return new Date(dateString).toLocaleString("en-US", {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   const getStatusBadge = (isActive: boolean, isExpired: boolean) => {
@@ -243,70 +264,66 @@ export default function SessionDetailPage() {
   };
 
   // Manual attendance functions
-  const handleManualAttendance = (student: Student) => {
+  const handleManualAttendance = (
+    student: Student,
+    status: "present" | "absent" = "present",
+  ) => {
     setSelectedStudent(student);
+    setManualAttendanceStatus(status);
     setShowManualAttendanceModal(true);
   };
 
-  const submitManualAttendance = async (reason: string) => {
+  const handleMarkAsPresent = (student: Student) => {
+    handleManualAttendance(student, "present");
+  };
+
+  const handleMarkAsAbsent = (student: Student) => {
+    handleManualAttendance(student, "absent");
+  };
+
+  const submitManualAttendance = async (
+    status: "present" | "absent",
+    reason: string,
+  ) => {
     if (!selectedStudent || !sessionData) return;
 
     setIsUpdatingAttendance(true);
 
     try {
-      const token = getAuthToken();
-      if (!token) {
-        throw new Error("Authentication token not found");
-      }
-
       const courseId = sessionData.session.course_id._id;
       const studentId = selectedStudent._id;
 
-      const response = await fetch(
-        `${API_BASE_URL}/courses/${courseId}/students/${studentId}/mark`,
-        {
-          method: "PATCH",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            sessionId: sessionId,
-            status: "manual_present",
-            reason: reason,
-          }),
-        },
+      // Use the course store function
+      await markStudentAttendance(
+        courseId,
+        sessionId,
+        studentId,
+        status,
+        reason,
       );
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.message || `HTTP error! status: ${response.status}`,
-        );
-      }
-
-      const result = await response.json();
-      console.log("Manual attendance result:", result);
-
       toast.success(`Attendance marked for ${selectedStudent.name}`, {
-        description: "Student has been manually marked as present",
+        description: `Student has been manually marked as ${status}`,
         duration: 4000,
       });
 
       // Refresh session data to reflect changes
-      const refreshResponse = await fetch(
-        `${API_BASE_URL}/sessions/${sessionId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
+      const token = getAuthToken();
+      if (token) {
+        const refreshResponse = await fetch(
+          `${API_BASE_URL}/sessions/${sessionId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
           },
-        },
-      );
+        );
 
-      if (refreshResponse.ok) {
-        const refreshedData = await refreshResponse.json();
-        setSessionData(refreshedData);
+        if (refreshResponse.ok) {
+          const refreshedData = await refreshResponse.json();
+          setSessionData(refreshedData);
+        }
       }
 
       // Close modal and reset
@@ -315,6 +332,88 @@ export default function SessionDetailPage() {
     } catch (error) {
       console.error("Manual attendance error:", error);
       toast.error("Failed to mark attendance", {
+        description:
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred",
+        duration: 4000,
+      });
+    } finally {
+      setIsUpdatingAttendance(false);
+    }
+  };
+
+  // Bulk attendance functions
+  const handleSelectStudent = (studentId: string) => {
+    setSelectedStudents((prev) => {
+      if (prev.includes(studentId)) {
+        return prev.filter((id) => id !== studentId);
+      } else {
+        return [...prev, studentId];
+      }
+    });
+  };
+
+  const handleSelectAllStudents = () => {
+    const filteredStudents = getFilteredStudents();
+    if (selectedStudents.length === filteredStudents.length) {
+      setSelectedStudents([]);
+    } else {
+      setSelectedStudents(filteredStudents.map((student) => student._id));
+    }
+  };
+
+  const handleBulkAttendance = () => {
+    setShowBulkAttendanceModal(true);
+  };
+
+  const submitBulkAttendance = async (
+    students: Array<{
+      studentId: string;
+      status: "present" | "absent";
+      reason: string;
+    }>,
+  ) => {
+    if (!sessionData) return;
+
+    setIsUpdatingAttendance(true);
+
+    try {
+      const courseId = sessionData.session.course_id._id;
+
+      // Use the course store function
+      const result = await bulkMarkAttendance(courseId, sessionId, students);
+
+      toast.success(`Bulk attendance completed`, {
+        description: `${result.summary.successful} students marked successfully`,
+        duration: 4000,
+      });
+
+      // Refresh session data to reflect changes
+      const token = getAuthToken();
+      if (token) {
+        const refreshResponse = await fetch(
+          `${API_BASE_URL}/sessions/${sessionId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          },
+        );
+
+        if (refreshResponse.ok) {
+          const refreshedData = await refreshResponse.json();
+          setSessionData(refreshedData);
+        }
+      }
+
+      // Clear selected students and close modal
+      setSelectedStudents([]);
+      setShowBulkAttendanceModal(false);
+    } catch (error) {
+      console.error("Bulk attendance error:", error);
+      toast.error("Failed to mark bulk attendance", {
         description:
           error instanceof Error
             ? error.message
@@ -347,7 +446,10 @@ export default function SessionDetailPage() {
       filtered = filtered.filter((student) => {
         if (statusFilter === "present") {
           // Include both "present" and "manual_present" students in present filter
-          return student.attendance_status === "present" || student.attendance_status === "manual_present";
+          return (
+            student.attendance_status === "present" ||
+            student.attendance_status === "manual_present"
+          );
         }
         return student.attendance_status === statusFilter;
       });
@@ -356,11 +458,12 @@ export default function SessionDetailPage() {
     // Sort by attendance status (present first), then by name
     return filtered.sort((a, b) => {
       // Helper function to determine if status is considered "present"
-      const isPresent = (status: string) => status === "present" || status === "manual_present";
-      
+      const isPresent = (status: string) =>
+        status === "present" || status === "manual_present";
+
       const aIsPresent = isPresent(a.attendance_status);
       const bIsPresent = isPresent(b.attendance_status);
-      
+
       if (aIsPresent !== bIsPresent) {
         if (aIsPresent) return -1;
         if (bIsPresent) return 1;
@@ -452,7 +555,12 @@ export default function SessionDetailPage() {
         {/* Header */}
         <div className="animate-appear flex flex-col gap-4 opacity-0 delay-100 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-4">
-            <Button variant="outline" size="sm" onClick={() => router.back()}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.back()}
+              className="md:hidden"
+            >
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back
             </Button>
@@ -536,7 +644,7 @@ export default function SessionDetailPage() {
                     <p className="text-muted-foreground mt-1 flex items-center gap-2 text-sm">
                       <Calendar className="h-4 w-4 flex-shrink-0" />
                       <span className="truncate">
-                        {formatDateTime(session.start_ts)}
+                        {formatDateTimeWithDay(session.start_ts)}
                       </span>
                     </p>
                   </div>
@@ -545,7 +653,7 @@ export default function SessionDetailPage() {
                     <p className="text-muted-foreground mt-1 flex items-center gap-2 text-sm">
                       <Clock className="h-4 w-4 flex-shrink-0" />
                       <span className="truncate">
-                        {formatDateTime(session.expiry_ts)}
+                        {formatDateTimeWithDay(session.expiry_ts)}
                       </span>
                     </p>
                   </div>
@@ -706,6 +814,39 @@ export default function SessionDetailPage() {
                   </DropdownMenu>
                 </div>
               )}
+
+              {/* Bulk Actions */}
+              {students.all.length > 0 && (
+                <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-4">
+                    <span className="text-muted-foreground text-sm">
+                      {selectedStudents.length} of{" "}
+                      {getFilteredStudents().length} selected
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSelectAllStudents}
+                    >
+                      {selectedStudents.length === getFilteredStudents().length
+                        ? "Deselect All"
+                        : "Select All"}
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={handleBulkAttendance}
+                      disabled={selectedStudents.length === 0}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      <Users className="mr-2 h-4 w-4" />
+                      Bulk Mark ({selectedStudents.length})
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardHeader>
             <CardContent className="p-0 sm:p-6">
               {students.all.length === 0 ? (
@@ -762,6 +903,18 @@ export default function SessionDetailPage() {
                         <table className="w-full">
                           <thead>
                             <tr className="border-border border-b">
+                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
+                                <input
+                                  type="checkbox"
+                                  checked={
+                                    selectedStudents.length ===
+                                      getFilteredStudents().length &&
+                                    getFilteredStudents().length > 0
+                                  }
+                                  onChange={handleSelectAllStudents}
+                                  className="rounded border-gray-300"
+                                />
+                              </th>
                               <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
                                 #
                               </th>
@@ -827,9 +980,23 @@ export default function SessionDetailPage() {
                                     className="border-border/50 hover:bg-muted/50 border-b transition-colors"
                                   >
                                     <td className="px-2 py-3 whitespace-nowrap">
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedStudents.includes(
+                                          student._id,
+                                        )}
+                                        onChange={() =>
+                                          handleSelectStudent(student._id)
+                                        }
+                                        className="rounded border-gray-300"
+                                      />
+                                    </td>
+                                    <td className="px-2 py-3 whitespace-nowrap">
                                       <div className="flex items-center gap-1">
                                         {student.attendance_status ===
-                                        "present" || student.attendance_status === "manual_present" ? (
+                                          "present" ||
+                                        student.attendance_status ===
+                                          "manual_present" ? (
                                           <CheckCircle className="h-3 w-3 flex-shrink-0 text-green-500" />
                                         ) : (
                                           <XCircle className="h-3 w-3 flex-shrink-0 text-red-500" />
@@ -853,7 +1020,9 @@ export default function SessionDetailPage() {
                                       <Badge
                                         variant={
                                           student.attendance_status ===
-                                          "present" || student.attendance_status === "manual_present"
+                                            "present" ||
+                                          student.attendance_status ===
+                                            "manual_present"
                                             ? "default"
                                             : student.attendance_status ===
                                                 "rejected"
@@ -862,8 +1031,9 @@ export default function SessionDetailPage() {
                                         }
                                         className="text-xs"
                                       >
-                                        {student.attendance_status === "manual_present" 
-                                          ? "MANUAL PRESENT" 
+                                        {student.attendance_status ===
+                                        "manual_present"
+                                          ? "MANUAL PRESENT"
                                           : student.attendance_status.toUpperCase()}
                                       </Badge>
                                     </td>
@@ -898,7 +1068,9 @@ export default function SessionDetailPage() {
                                     <td className="px-2 py-3 whitespace-nowrap">
                                       <p className="min-w-[100px] text-xs">
                                         {student.submitted_at
-                                          ? formatDateTime(student.submitted_at)
+                                          ? formatDateTimeWithDay(
+                                              student.submitted_at,
+                                            )
                                           : "-"}
                                       </p>
                                     </td>
@@ -913,20 +1085,38 @@ export default function SessionDetailPage() {
                                       </div>
                                     </td>
                                     <td className="px-2 py-3 whitespace-nowrap">
-                                      {student.attendance_status ===
-                                        "absent" && (
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() =>
-                                            handleManualAttendance(student)
-                                          }
-                                          className="h-7 w-7 p-0 transition-all duration-200 hover:scale-105"
-                                          title="Mark as present manually"
-                                        >
-                                          <UserCheck className="h-3 w-3" />
-                                        </Button>
-                                      )}
+                                      <div className="flex gap-1">
+                                        {student.attendance_status ===
+                                          "absent" && (
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() =>
+                                              handleMarkAsPresent(student)
+                                            }
+                                            className="h-7 w-7 p-0 transition-all duration-200 hover:scale-105"
+                                            title="Mark as present manually"
+                                          >
+                                            <UserCheck className="h-3 w-3" />
+                                          </Button>
+                                        )}
+                                        {(student.attendance_status ===
+                                          "present" ||
+                                          student.attendance_status ===
+                                            "manual_present") && (
+                                          <Button
+                                            variant="destructive"
+                                            size="sm"
+                                            onClick={() =>
+                                              handleMarkAsAbsent(student)
+                                            }
+                                            className="h-7 w-7 p-0 transition-all duration-200 hover:scale-105"
+                                            title="Mark as absent manually"
+                                          >
+                                            <X className="h-3 w-3" />
+                                          </Button>
+                                        )}
+                                      </div>
                                     </td>
                                   </tr>
                                 );
@@ -934,7 +1124,7 @@ export default function SessionDetailPage() {
                             ) : (
                               <tr>
                                 <td
-                                  colSpan={8}
+                                  colSpan={9}
                                   className="px-4 py-8 text-center"
                                 >
                                   <p className="text-muted-foreground text-sm">
@@ -957,6 +1147,18 @@ export default function SessionDetailPage() {
                       <table className="w-full">
                         <thead>
                           <tr className="border-border border-b">
+                            <th className="text-muted-foreground w-12 px-4 py-3 text-left text-sm font-medium">
+                              <input
+                                type="checkbox"
+                                checked={
+                                  selectedStudents.length ===
+                                    getFilteredStudents().length &&
+                                  getFilteredStudents().length > 0
+                                }
+                                onChange={handleSelectAllStudents}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                            </th>
                             <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
                               #
                             </th>
@@ -1022,9 +1224,23 @@ export default function SessionDetailPage() {
                                   className="border-border/50 hover:bg-muted/50 border-b transition-colors"
                                 >
                                   <td className="px-4 py-4">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedStudents.includes(
+                                        student._id,
+                                      )}
+                                      onChange={() =>
+                                        handleSelectStudent(student._id)
+                                      }
+                                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    />
+                                  </td>
+                                  <td className="px-4 py-4">
                                     <div className="flex items-center gap-2">
                                       {student.attendance_status ===
-                                      "present" || student.attendance_status === "manual_present" ? (
+                                        "present" ||
+                                      student.attendance_status ===
+                                        "manual_present" ? (
                                         <CheckCircle className="h-4 w-4 text-green-500" />
                                       ) : (
                                         <XCircle className="h-4 w-4 text-red-500" />
@@ -1052,7 +1268,9 @@ export default function SessionDetailPage() {
                                       <Badge
                                         variant={
                                           student.attendance_status ===
-                                          "present" || student.attendance_status === "manual_present"
+                                            "present" ||
+                                          student.attendance_status ===
+                                            "manual_present"
                                             ? "default"
                                             : student.attendance_status ===
                                                 "rejected"
@@ -1061,8 +1279,9 @@ export default function SessionDetailPage() {
                                         }
                                         className="text-xs"
                                       >
-                                        {student.attendance_status === "manual_present" 
-                                          ? "MANUAL PRESENT" 
+                                        {student.attendance_status ===
+                                        "manual_present"
+                                          ? "MANUAL PRESENT"
                                           : student.attendance_status.toUpperCase()}
                                       </Badge>
                                       {student.reason && (
@@ -1103,7 +1322,9 @@ export default function SessionDetailPage() {
                                   <td className="px-4 py-4">
                                     <p className="text-sm">
                                       {student.submitted_at
-                                        ? formatDateTime(student.submitted_at)
+                                        ? formatDateTimeWithDay(
+                                            student.submitted_at,
+                                          )
                                         : "-"}
                                     </p>
                                   </td>
@@ -1118,26 +1339,45 @@ export default function SessionDetailPage() {
                                     </div>
                                   </td>
                                   <td className="px-4 py-4">
-                                    {student.attendance_status === "absent" && (
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() =>
-                                          handleManualAttendance(student)
-                                        }
-                                        className="h-8 w-8 p-0 transition-all duration-200 hover:scale-105"
-                                        title="Mark as present manually"
-                                      >
-                                        <UserCheck className="h-4 w-4" />
-                                      </Button>
-                                    )}
+                                    <div className="flex gap-2">
+                                      {student.attendance_status ===
+                                        "absent" && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() =>
+                                            handleMarkAsPresent(student)
+                                          }
+                                          className="h-8 w-8 p-0 transition-all duration-200 hover:scale-105"
+                                          title="Mark as present manually"
+                                        >
+                                          <UserCheck className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                      {(student.attendance_status ===
+                                        "present" ||
+                                        student.attendance_status ===
+                                          "manual_present") && (
+                                        <Button
+                                          variant="destructive"
+                                          size="sm"
+                                          onClick={() =>
+                                            handleMarkAsAbsent(student)
+                                          }
+                                          className="h-8 w-8 p-0 transition-all duration-200 hover:scale-105"
+                                          title="Mark as absent manually"
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                    </div>
                                   </td>
                                 </tr>
                               );
                             })
                           ) : (
                             <tr>
-                              <td colSpan={8} className="px-4 py-8 text-center">
+                              <td colSpan={9} className="px-4 py-8 text-center">
                                 <p className="text-muted-foreground text-sm">
                                   {searchQuery || statusFilter !== "all"
                                     ? "No students found matching your search criteria"
@@ -1167,8 +1407,37 @@ export default function SessionDetailPage() {
         onSubmit={submitManualAttendance}
         student={selectedStudent}
         isLoading={isUpdatingAttendance}
-        sessionCode={session.session_code}
-        courseName={`${session.course_id.course_code} - ${session.course_id.title}`}
+        sessionCode={sessionData?.session.session_code || ""}
+        courseName={
+          sessionData
+            ? `${sessionData.session.course_id.course_code} - ${sessionData.session.course_id.title}`
+            : ""
+        }
+        defaultStatus={manualAttendanceStatus}
+      />
+
+      {/* Bulk Attendance Modal */}
+      <BulkAttendanceModal
+        isOpen={showBulkAttendanceModal}
+        onClose={() => {
+          setShowBulkAttendanceModal(false);
+          setSelectedStudents([]);
+        }}
+        onSubmit={submitBulkAttendance}
+        selectedStudents={
+          sessionData
+            ? getFilteredStudents().filter((student) =>
+                selectedStudents.includes(student._id),
+              )
+            : []
+        }
+        isLoading={isUpdatingAttendance}
+        sessionCode={sessionData?.session.session_code || ""}
+        courseName={
+          sessionData
+            ? `${sessionData.session.course_id.course_code} - ${sessionData.session.course_id.title}`
+            : ""
+        }
       />
     </DashboardLayout>
   );

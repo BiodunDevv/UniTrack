@@ -171,6 +171,7 @@ export default function LiveSessionPage() {
     return new Date(dateString).toLocaleString();
   };
 
+
   const formatTimeRemaining = (expiresAt: string) => {
     const now = new Date();
     const expiry = new Date(expiresAt);

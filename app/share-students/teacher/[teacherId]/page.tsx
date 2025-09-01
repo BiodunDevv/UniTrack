@@ -3,19 +3,14 @@
 import {
   ArrowLeft,
   BookOpen,
-  Clock,
-  Edit,
-  Eye,
   GraduationCap,
-  Plus,
+  Mail,
   Search,
-  Trash2,
   Users,
+  X,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
-import * as React from "react";
-import { useState } from "react";
-import { toast } from "sonner";
+import { useParams, useRouter } from "next/navigation";
+import React from "react";
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { Badge } from "@/components/ui/badge";
@@ -29,128 +24,39 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Pagination } from "@/components/ui/pagination";
-import { UpdateCourseModal } from "@/components/ui/update-course-modal";
-import { useAuthStore } from "@/store/auth-store";
-import { useCourseStore } from "@/store/course-store";
+import { useStudentShareStore } from "@/store/student-share-store";
 
-export default function CoursesPage() {
+export default function TeacherDetailPage() {
   const router = useRouter();
+  const params = useParams();
+  const teacherId = params.teacherId as string;
+
   const {
-    courses,
+    teachers,
+    teacherCourses,
     isLoading,
-    error,
-    pagination,
-    totalStudents,
-    totalActiveSessions,
-    getAllCourses,
-    updateCourse,
-    deleteCourse,
-    setCurrentCourse,
-    setCurrentPage: setCourseStorePage,
-    clearError,
-  } = useCourseStore();
+    isLoadingTeachers,
+    isLoadingCourses,
+    getTeachers,
+    getTeacherCourses,
+  } = useStudentShareStore();
 
-  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [showUpdateModal, setShowUpdateModal] = useState(false);
-  const [courseToUpdate, setCourseToUpdate] = useState<
-    (typeof courses)[0] | null
-  >(null);
+  const [searchQuery, setSearchQuery] = React.useState("");
 
-  // Fetch courses on component mount
+  const teacher = teachers.find((t) => t._id === teacherId);
+
+  // Fetch data
   React.useEffect(() => {
-    if (isAuthenticated && !authLoading) {
-      getAllCourses();
+    if (teacherId) {
+      getTeachers();
+      getTeacherCourses(teacherId);
     }
-  }, [getAllCourses, isAuthenticated, authLoading]);
+  }, [teacherId, getTeachers, getTeacherCourses]);
 
-  React.useEffect(() => {
-    if (error) {
-      toast.error(error);
-      clearError();
-    }
-  }, [error, clearError]);
-
-  // Reset to first page when search query changes
-  React.useEffect(() => {
-    if (searchQuery) {
-      setCurrentPage(1);
-    }
-  }, [searchQuery]);
-
-  // Filter courses based on search query (client-side filtering for search)
-  const filteredCourses = searchQuery
-    ? courses.filter(
-        (course) =>
-          course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          course.course_code
-            .toLowerCase()
-            .includes(searchQuery.toLowerCase()) ||
-          course.level.toString().includes(searchQuery.toLowerCase()),
-      )
-    : courses;
-
-  const handleCourseClick = (course: (typeof courses)[0]) => {
-    setCurrentCourse(course);
-    router.push(`/course/${course._id}`);
+  const handleCourseClick = (courseId: string) => {
+    router.push(`/share-students/teacher/${teacherId}/course/${courseId}`);
   };
 
-  const handleStudentsClick = (courseId: string) => {
-    router.push(`/students/${courseId}`);
-  };
-  const handleDeleteCourse = async (courseId: string, courseTitle: string) => {
-    if (
-      confirm(
-        `Are you sure you want to delete "${courseTitle}"? This action cannot be undone.`,
-      )
-    ) {
-      try {
-        await deleteCourse(courseId);
-        toast.success("Course deleted successfully");
-        // Refresh all courses and maintain current page if possible
-        getAllCourses();
-      } catch (error) {
-        toast.error("Failed to delete course");
-        console.error("Failed to delete course:", error);
-      }
-    }
-  };
-
-  const handleEditCourse = (course: (typeof courses)[0]) => {
-    setCourseToUpdate(course);
-    setShowUpdateModal(true);
-  };
-
-  const handleUpdateCourse = async (
-    courseId: string,
-    data: { title?: string; level?: number },
-  ) => {
-    try {
-      await updateCourse(courseId, data);
-      // Refresh courses list after update
-      getAllCourses();
-    } catch (error) {
-      throw error; // Let the modal handle the error
-    }
-  };
-
-  // Handle pagination change
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    setCourseStorePage(page);
-  };
-
-  // Get time-based greeting
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
-  };
-
-  // Format level for display
   const formatLevel = (level: number) => {
     const levelMap: { [key: number]: string } = {
       100: "1st Year",
@@ -163,22 +69,78 @@ export default function CoursesPage() {
     return levelMap[level] || `Level ${level}`;
   };
 
-  // Format date with day of week
-  const formatDateWithDay = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      weekday: "short",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+  // Filter courses based on search query
+  const filteredCourses = searchQuery
+    ? teacherCourses.filter(
+        (course) =>
+          course.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          course.course_code
+            ?.toLowerCase()
+            .includes(searchQuery.toLowerCase()) ||
+          course.level?.toString().includes(searchQuery),
+      )
+    : teacherCourses;
+
+  // Get time-based greeting
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
   };
+
+  if ((isLoadingTeachers || isLoading) && !teacher) {
+    return (
+      <DashboardLayout>
+        <div className="flex min-h-screen flex-1 items-center justify-center">
+          <div className="text-center">
+            <div className="border-primary mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-b-2"></div>
+            <p className="text-muted-foreground">Loading teacher details...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!teacher) {
+    return (
+      <DashboardLayout>
+        <div className="flex flex-1 items-center justify-center">
+          <div className="text-center">
+            <div className="bg-primary/10 text-primary mb-4 rounded-full p-4">
+              <Users className="h-12 w-12" />
+            </div>
+            <h3 className="mb-2 text-lg font-semibold lg:text-xl">
+              Teacher not found
+            </h3>
+            <p className="text-muted-foreground mb-4 max-w-md text-center text-sm lg:text-base">
+              The teacher you&apos;re looking for doesn&apos;t exist or may have
+              been removed.
+            </p>
+            <Button
+              onClick={() => router.push("/share-students")}
+              className="hover:shadow-primary/20 transition-all duration-300 hover:scale-105 hover:shadow-lg"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Teachers
+            </Button>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
       <div className="space-y-6 p-4 lg:p-6">
         {/* Breadcrumb */}
         <div className="animate-appear opacity-0">
-          <Breadcrumb items={[{ label: "Courses", current: true }]} />
+          <Breadcrumb
+            items={[
+              { label: "Share Students", href: "/share-students" },
+              { label: teacher.name, current: true },
+            ]}
+          />
         </div>
 
         {/* Header Section */}
@@ -188,36 +150,25 @@ export default function CoursesPage() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => router.push(`/`)}
+                onClick={() => router.push("/share-students")}
                 className="hover:bg-accent hover:text-accent-foreground transition-all duration-300 md:hidden"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Home
+                Back to Teachers
               </Button>
             </div>
             <h1 className="from-foreground to-muted-foreground bg-gradient-to-r bg-clip-text text-3xl font-bold text-transparent lg:text-4xl">
-              Course Management
+              {teacher.name}&apos;s Courses
             </h1>
             <p className="text-muted-foreground text-sm lg:text-base">
-              {getGreeting()}, {user?.name || "Lecturer"} • Manage your courses
-              and track progress
-              {!isLoading &&
-                pagination &&
-                pagination.totalPages > 1 &&
-                !searchQuery && (
-                  <span className="ml-2">
-                    • Page {pagination.currentPage} of {pagination.totalPages}
-                  </span>
-                )}
+              {getGreeting()} • Browse and request students from {teacher.name}
+              &apos;s courses
             </p>
+            <div className="text-muted-foreground flex items-center gap-2 text-sm">
+              <Mail className="h-4 w-4" />
+              {teacher.email}
+            </div>
           </div>
-          <Button
-            onClick={() => router.push("/course/create")}
-            className="border-border/50 bg-primary hover:bg-primary/90 hover:shadow-primary/20 backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:shadow-lg"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Create Course
-          </Button>
         </div>
 
         {/* Stats Cards */}
@@ -233,14 +184,14 @@ export default function CoursesPage() {
             </CardHeader>
             <CardContent>
               <div className="group-hover:text-primary/90 text-2xl font-bold transition-colors duration-300">
-                {isLoading ? (
+                {isLoadingCourses ? (
                   <div className="border-primary h-8 w-8 animate-spin rounded-full border-b-2"></div>
                 ) : (
-                  pagination?.totalCourses || courses.length
+                  teacherCourses.length
                 )}
               </div>
               <p className="text-muted-foreground group-hover:text-foreground/80 text-xs transition-colors duration-300">
-                {isLoading ? "" : "Total courses"}
+                {isLoadingCourses ? "" : "Available courses"}
               </p>
             </CardContent>
           </Card>
@@ -256,14 +207,18 @@ export default function CoursesPage() {
             </CardHeader>
             <CardContent>
               <div className="group-hover:text-primary/90 text-2xl font-bold transition-colors duration-300">
-                {isLoading ? (
+                {isLoadingCourses ? (
                   <div className="border-primary h-8 w-8 animate-spin rounded-full border-b-2"></div>
                 ) : (
-                  totalStudents
+                  teacherCourses.reduce(
+                    (total: number, course) =>
+                      total + (course.student_count || 0),
+                    0,
+                  )
                 )}
               </div>
               <p className="text-muted-foreground group-hover:text-foreground/80 text-xs transition-colors duration-300">
-                {isLoading ? "" : "Enrolled students"}
+                {isLoadingCourses ? "" : "Enrolled students"}
               </p>
             </CardContent>
           </Card>
@@ -271,22 +226,22 @@ export default function CoursesPage() {
           <Card className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 backdrop-blur-sm transition-all duration-500 hover:shadow-lg sm:col-span-2 lg:col-span-1">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="group-hover:text-primary text-sm font-medium transition-colors duration-300">
-                Active Sessions
+                Available Levels
               </CardTitle>
               <div className="bg-primary/10 text-primary group-hover:bg-primary/20 rounded-lg p-2 transition-all duration-500 group-hover:scale-110 group-hover:rotate-3">
-                <Clock className="h-4 w-4 group-hover:animate-pulse" />
+                <GraduationCap className="h-4 w-4 group-hover:animate-pulse" />
               </div>
             </CardHeader>
             <CardContent>
               <div className="group-hover:text-primary/90 text-2xl font-bold transition-colors duration-300">
-                {isLoading ? (
+                {isLoadingCourses ? (
                   <div className="border-primary h-8 w-8 animate-spin rounded-full border-b-2"></div>
                 ) : (
-                  totalActiveSessions
+                  new Set(teacherCourses.map((course) => course.level)).size
                 )}
               </div>
               <p className="text-muted-foreground group-hover:text-foreground/80 text-xs transition-colors duration-300">
-                {isLoading ? "" : "Running sessions"}
+                {isLoadingCourses ? "" : "Different year levels"}
               </p>
             </CardContent>
           </Card>
@@ -302,9 +257,19 @@ export default function CoursesPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="border-border/50 bg-card/50 hover:border-border focus:border-primary pl-9 backdrop-blur-sm transition-all duration-300"
             />
+            {searchQuery && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSearchQuery("")}
+                className="absolute top-1/2 right-1 h-7 w-7 -translate-y-1/2 p-0"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            )}
           </div>
           {/* Search results counter - only show for search */}
-          {searchQuery && !isLoading && (
+          {searchQuery && !isLoadingCourses && (
             <div className="text-muted-foreground text-sm">
               {filteredCourses.length} result
               {filteredCourses.length !== 1 ? "s" : ""} found
@@ -314,7 +279,7 @@ export default function CoursesPage() {
 
         {/* Courses Grid */}
         <div className="animate-appear space-y-8 opacity-0 delay-500">
-          {isLoading ? (
+          {isLoadingCourses ? (
             <div className="flex flex-1 items-center justify-center">
               <div className="text-center">
                 <div className="border-primary mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-b-2"></div>
@@ -328,20 +293,20 @@ export default function CoursesPage() {
                   <GraduationCap className="h-12 w-12" />
                 </div>
                 <h3 className="mb-2 text-lg font-semibold lg:text-xl">
-                  {searchQuery ? "No courses found" : "No courses yet"}
+                  {searchQuery ? "No courses found" : "No courses available"}
                 </h3>
                 <p className="text-muted-foreground mb-4 max-w-md text-center text-sm lg:text-base">
                   {searchQuery
-                    ? "Try adjusting your search terms to find what you're looking for"
-                    : "Get started by creating your first course and begin your teaching journey"}
+                    ? `No courses found matching "${searchQuery}"`
+                    : `${teacher.name} has no courses available for student sharing at the moment`}
                 </p>
-                {!searchQuery && (
+                {searchQuery && (
                   <Button
-                    onClick={() => router.push("/course/create")}
+                    variant="outline"
+                    onClick={() => setSearchQuery("")}
                     className="hover:shadow-primary/20 transition-all duration-300 hover:scale-105 hover:shadow-lg"
                   >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create Your First Course
+                    Clear search
                   </Button>
                 )}
               </CardContent>
@@ -353,15 +318,12 @@ export default function CoursesPage() {
                   key={course._id}
                   className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 cursor-pointer backdrop-blur-sm transition-all duration-300 hover:shadow-lg"
                   style={{
-                    animationName: "fadeInUp",
-                    animationDuration: "0.4s",
-                    animationTimingFunction: "ease-out",
-                    animationFillMode: "forwards",
                     animationDelay: `${index * 50}ms`,
+                    animation: "fadeInUp 0.4s ease-out forwards",
                     opacity: 0,
                     transform: "translateY(10px)",
                   }}
-                  onClick={() => handleCourseClick(course)}
+                  onClick={() => handleCourseClick(course._id)}
                 >
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
@@ -377,23 +339,14 @@ export default function CoursesPage() {
                             {course.course_code}
                           </Badge>
                           <Badge variant="secondary" className="text-xs">
-                            {formatLevel(course.level)}
+                            {formatLevel(course.level || 0)}
                           </Badge>
-                          {course.has_active_session && (
-                            <Badge
-                              variant="default"
-                              className="border-green-200 bg-green-100 text-xs text-green-800"
-                            >
-                              <Clock className="mr-1 h-3 w-3" />
-                              Live
-                            </Badge>
-                          )}
                         </div>
                         <CardTitle className="group-hover:text-primary text-base transition-colors duration-300 lg:text-lg">
                           {course.title}
                         </CardTitle>
                         <CardDescription className="text-xs lg:text-sm">
-                          Instructor: {course.teacher_id.name}
+                          Instructor: {teacher.name}
                         </CardDescription>
                       </div>
                     </div>
@@ -411,19 +364,17 @@ export default function CoursesPage() {
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-muted-foreground text-xs">
-                            Active Sessions
+                            Level
                           </span>
                           <span className="text-xs font-medium">
-                            {course.active_sessions_count || 0}
+                            {course.level}
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-muted-foreground text-xs">
-                            Created
+                            Code
                           </span>
-                          <span className="text-xs">
-                            {formatDateWithDay(course.created_at)}
-                          </span>
+                          <span className="text-xs">{course.course_code}</span>
                         </div>
                       </div>
 
@@ -433,45 +384,12 @@ export default function CoursesPage() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleCourseClick(course);
+                            handleCourseClick(course._id);
                           }}
                           className="border-border/50 bg-background/50 hover:bg-primary hover:text-primary-foreground flex-1 backdrop-blur-sm transition-all duration-300"
                         >
-                          <Eye className="mr-1 h-3 w-3" />
-                          View
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleStudentsClick(course._id);
-                          }}
-                          className="border-border/50 backdrop-blur-sm transition-all duration-300"
-                        >
-                          <Users className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditCourse(course);
-                          }}
-                          className="border-border/50 backdrop-blur-sm transition-all duration-30"
-                        >
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteCourse(course._id, course.title);
-                          }}
-                          className="border-red-200 backdrop-blur-sm transition-all duration-300 hover:border-red-300 hover:bg-red-100 hover:text-red-700"
-                        >
-                          <Trash2 className="h-3 w-3" />
+                          <Users className="mr-1 h-3 w-3" />
+                          View Students
                         </Button>
                       </div>
                     </div>
@@ -480,37 +398,8 @@ export default function CoursesPage() {
               ))}
             </div>
           )}
-
-          {/* Pagination Controls */}
-          {!searchQuery &&
-            pagination &&
-            pagination.totalPages > 1 &&
-            !isLoading && (
-              <Pagination
-                currentPage={currentPage}
-                totalPages={pagination.totalPages}
-                onPageChange={handlePageChange}
-                totalItems={pagination.totalCourses || 0}
-                itemsPerPage={8}
-                itemName="courses"
-              />
-            )}
         </div>
       </div>
-
-      {/* Update Course Modal */}
-      {courseToUpdate && (
-        <UpdateCourseModal
-          isOpen={showUpdateModal}
-          onClose={() => {
-            setShowUpdateModal(false);
-            setCourseToUpdate(null);
-          }}
-          onUpdateCourse={handleUpdateCourse}
-          course={courseToUpdate}
-          isLoading={isLoading}
-        />
-      )}
     </DashboardLayout>
   );
 }

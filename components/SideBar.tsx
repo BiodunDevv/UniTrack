@@ -8,6 +8,7 @@ import {
   HelpCircle,
   PanelRightClose,
   Plus,
+  Share2,
   User,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -136,6 +137,21 @@ export function CustomSidebar({ onClose }: CustomSidebarProps) {
           {
             title: "All Sessions",
             url: "/session",
+          },
+        ],
+      },
+      {
+        title: "Share Students",
+        url: "/share-students",
+        icon: Share2,
+        items: [
+          {
+            title: "Request Students",
+            url: "/share-students",
+          },
+          {
+            title: "Manage Requests",
+            url: "/share-students?tab=incoming",
           },
         ],
       },

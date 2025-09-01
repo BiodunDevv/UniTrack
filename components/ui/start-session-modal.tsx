@@ -60,7 +60,7 @@ export function StartSessionModal({
       {
         enableHighAccuracy: true,
         timeout: 10000,
-        maximumAge: 300000, // 5 minutes
+        maximumAge: 300000,
       },
     );
   };
@@ -139,11 +139,27 @@ export function StartSessionModal({
             )}
 
             {location && (
-              <div className="rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-950">
-                <p className="text-sm text-green-700 dark:text-green-300">
-                  ✓ Location acquired: {location.lat.toFixed(6)},{" "}
-                  {location.lng.toFixed(6)}
-                </p>
+              <div className="space-y-3">
+                <div className="rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-950">
+                  <p className="text-sm text-green-700 dark:text-green-300">
+                    ✓ Location acquired: {location.lat.toFixed(6)},{" "}
+                    {location.lng.toFixed(6)}
+                  </p>
+                </div>
+
+                {/* Google Maps Preview */}
+                <div className="overflow-hidden rounded-lg border">
+                  <iframe
+                    src={`https://maps.google.com/maps?q=${location.lat},${location.lng}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+                    width="100%"
+                    height="200"
+                    style={{ border: 0 }}
+                    allowFullScreen
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                    title="Location Preview"
+                  />
+                </div>
               </div>
             )}
 
