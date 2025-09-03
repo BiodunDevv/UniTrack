@@ -46,7 +46,6 @@ export default function CoursesPage() {
     getAllCourses,
     updateCourse,
     deleteCourse,
-    setCurrentCourse,
     setCurrentPage: setCourseStorePage,
     clearError,
   } = useCourseStore();
@@ -92,14 +91,6 @@ export default function CoursesPage() {
       )
     : courses;
 
-  const handleCourseClick = (course: (typeof courses)[0]) => {
-    setCurrentCourse(course);
-    router.push(`/course/${course._id}`);
-  };
-
-  const handleStudentsClick = (courseId: string) => {
-    router.push(`/students/${courseId}`);
-  };
   const handleDeleteCourse = async (courseId: string, courseTitle: string) => {
     if (
       confirm(
@@ -189,7 +180,7 @@ export default function CoursesPage() {
                 size="sm"
                 variant="outline"
                 onClick={() => router.push(`/`)}
-                className="hover:bg-accent hover:text-accent-foreground transition-all duration-300 md:hidden"
+                className="hover:bg-accent hover:text-accent-foreground transition-all duration-300"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to Home
@@ -212,7 +203,7 @@ export default function CoursesPage() {
             </p>
           </div>
           <Button
-            onClick={() => router.push("/course/create")}
+            href="/course/create"
             className="border-border/50 bg-primary hover:bg-primary/90 hover:shadow-primary/20 backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:shadow-lg"
           >
             <Plus className="mr-2 h-4 w-4" />
@@ -337,7 +328,7 @@ export default function CoursesPage() {
                 </p>
                 {!searchQuery && (
                   <Button
-                    onClick={() => router.push("/course/create")}
+                    href="/course/create"
                     className="hover:shadow-primary/20 transition-all duration-300 hover:scale-105 hover:shadow-lg"
                   >
                     <Plus className="mr-2 h-4 w-4" />
@@ -351,17 +342,12 @@ export default function CoursesPage() {
               {filteredCourses.map((course, index) => (
                 <Card
                   key={course._id}
-                  className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 cursor-pointer backdrop-blur-sm transition-all duration-300 hover:shadow-lg"
-                  style={{
-                    animationName: "fadeInUp",
-                    animationDuration: "0.4s",
-                    animationTimingFunction: "ease-out",
-                    animationFillMode: "forwards",
-                    animationDelay: `${index * 50}ms`,
-                    opacity: 0,
-                    transform: "translateY(10px)",
-                  }}
-                  onClick={() => handleCourseClick(course)}
+                  className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 animate-fade-in-up animate-stagger cursor-pointer backdrop-blur-sm transition-all duration-300"
+                  style={
+                    {
+                      "--stagger-delay": index,
+                    } as React.CSSProperties
+                  }
                 >
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
@@ -431,10 +417,7 @@ export default function CoursesPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCourseClick(course);
-                          }}
+                          href={`/course/${course._id}`}
                           className="border-border/50 bg-background/50 hover:bg-primary hover:text-primary-foreground flex-1 backdrop-blur-sm transition-all duration-300"
                         >
                           <Eye className="mr-1 h-3 w-3" />
@@ -443,10 +426,7 @@ export default function CoursesPage() {
                         <Button
                           variant="secondary"
                           size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleStudentsClick(course._id);
-                          }}
+                          href={`/students/${course._id}`}
                           className="border-border/50 backdrop-blur-sm transition-all duration-300"
                         >
                           <Users className="h-3 w-3" />

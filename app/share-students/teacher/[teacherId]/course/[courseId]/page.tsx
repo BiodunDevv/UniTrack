@@ -229,7 +229,7 @@ export default function CourseStudentsPage() {
                 onClick={() =>
                   router.push(`/share-students/teacher/${teacherId}`)
                 }
-                className="hover:bg-accent hover:text-accent-foreground transition-all duration-300 md:hidden"
+                className="hover:bg-accent hover:text-accent-foreground transition-all duration-300"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to Courses

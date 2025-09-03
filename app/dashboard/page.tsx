@@ -1,18 +1,19 @@
 "use client";
 
 import {
-  AlertCircle,
+  Activity,
   BookOpen,
   Calendar,
   Clock,
-  Download,
-  Filter,
-  MapPin,
+  GraduationCap,
+  Play,
+  Plus,
   TrendingUp,
+  UserPlus,
   Users,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect,useState } from "react";
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -27,149 +28,224 @@ import {
 } from "@/components/ui/card";
 import { CourseSelectionModal } from "@/components/ui/course-selection-modal";
 import { Separator } from "@/components/ui/separator";
-
-import attendanceData from "./attendance-data.json";
-
-// Type definition for attendance records
-interface AttendanceRecord {
-  id: number;
-  student_name: string;
-  student_id: string;
-  course: string;
-  date: string;
-  check_in_time: string | null;
-  check_out_time: string | null;
-  status: "Present" | "Late" | "Absent";
-  location: string | null;
-}
-
-// Type assertion for the imported data
-const typedAttendanceData = attendanceData as AttendanceRecord[];
-
-// Function to get time-based greeting
-const getTimeBasedGreeting = () => {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good Morning";
-  if (hour < 17) return "Good Afternoon";
-  return "Good Evening";
-};
-
-// Dashboard Stats
-const stats = [
-  {
-    title: "Total Students",
-    value: "1,234",
-    change: "+12%",
-    icon: Users,
-    changeType: "positive",
-  },
-  {
-    title: "Present Today",
-    value: "1,089",
-    change: "+5%",
-    icon: Clock,
-    changeType: "positive",
-  },
-  {
-    title: "Attendance Rate",
-    value: "88.2%",
-    change: "-2.1%",
-    icon: TrendingUp,
-    changeType: "negative",
-  },
-  {
-    title: "Late Arrivals",
-    value: "23",
-    change: "+8",
-    icon: AlertCircle,
-    changeType: "negative",
-  },
-];
-
-// Recent activity
-const recentActivity = [
-  {
-    id: 1,
-    student: "Alice Johnson",
-    action: "Checked in",
-    time: "9:15 AM",
-    location: "Main Campus",
-    status: "present",
-  },
-  {
-    id: 2,
-    student: "Bob Wilson",
-    action: "Checked out",
-    time: "5:30 PM",
-    location: "Library",
-    status: "absent",
-  },
-  {
-    id: 3,
-    student: "Carol Davis",
-    action: "Late arrival",
-    time: "9:45 AM",
-    location: "Science Building",
-    status: "late",
-  },
-  {
-    id: 4,
-    student: "David Brown",
-    action: "Checked in",
-    time: "8:30 AM",
-    location: "Main Campus",
-    status: "present",
-  },
-];
+import {
+  formatNumber,
+  getTimeBasedGreeting,
+} from "@/lib/device-utils";
+import { useAdminStore } from "@/store/admin-store";
+import { useAuthStore } from "@/store/auth-store";
+import { useCourseStore } from "@/store/course-store";
+import { useProfileStore } from "@/store/profile-store";
+import { useSessionStore } from "@/store/session-store";
 
 export default function DashboardPage() {
   const router = useRouter();
   const [showCourseSelectionModal, setShowCourseSelectionModal] =
     useState(false);
 
+  // Store hooks
+  const { user } = useAuthStore();
+  const {
+    courses,
+    getAllCourses,
+  } = useCourseStore();
+  const {
+    sessions,
+    getAllSessions,
+    summary: sessionSummary,
+  } = useSessionStore();
+  const { getProfile } = useProfileStore();
+
+  // Admin-specific data
+  const {
+    teachers,
+    getAllTeachers,
+    auditLogs,
+    getAuditLogs,
+  } = useAdminStore();
+
+  const isAdmin = user?.role === "admin";
+
+  // Fetch data on mount
+  useEffect(() => {
+    if (user) {
+      getProfile();
+      getAllCourses();
+
+      if (isAdmin) {
+        // Admin only fetches teachers and audit logs
+        getAllTeachers(1, 10);
+        getAuditLogs(1, 20);
+      } else {
+        // Only teachers can fetch sessions
+        getAllSessions(1, 10, "active");
+      }
+    }
+  }, [
+    user,
+    isAdmin,
+    getProfile,
+    getAllCourses,
+    getAllSessions,
+    getAllTeachers,
+    getAuditLogs,
+  ]);
+
+  // Calculate stats from real data
+  const totalCourses = courses.length;
+  const activeSessions = sessionSummary?.active_sessions || 0;
+  const totalSessions = sessionSummary?.total_sessions || 0;
+  const totalStudents = courses.reduce(
+    (acc, course) => acc + (course.student_count || 0),
+    0,
+  );
+  const totalTeachers = teachers.length;
+  const recentActivities = auditLogs.slice(0, 5);
+
+  // For admin, sessions data might not be available
+  const sessionsToday = isAdmin
+    ? 0
+    : sessions.filter(
+        (s) =>
+          new Date(s.created_at).toDateString() === new Date().toDateString(),
+      ).length;
+
+  // Stats for different user roles
+  const adminStats = [
+    {
+      title: "Total Teachers",
+      value: formatNumber(totalTeachers),
+      change: "+12%",
+      icon: Users,
+      changeType: "positive" as const,
+    },
+    {
+      title: "Total Courses",
+      value: formatNumber(totalCourses),
+      change: "+8%",
+      icon: BookOpen,
+      changeType: "positive" as const,
+    },
+    {
+      title: "Total Students",
+      value: formatNumber(totalStudents),
+      change: "+15%",
+      icon: GraduationCap,
+      changeType: "positive" as const,
+    },
+    {
+      title: "Recent Activities",
+      value: formatNumber(recentActivities.length),
+      change: `+${recentActivities.length}`,
+      icon: Activity,
+      changeType: "positive" as const,
+    },
+  ];
+
+  const teacherStats = [
+    {
+      title: "My Courses",
+      value: formatNumber(totalCourses),
+      change: "+2",
+      icon: BookOpen,
+      changeType: "positive" as const,
+    },
+    {
+      title: "Active Sessions",
+      value: formatNumber(activeSessions),
+      change: `${activeSessions > 0 ? "+" : ""}${activeSessions}`,
+      icon: Clock,
+      changeType:
+        activeSessions > 0 ? ("positive" as const) : ("neutral" as const),
+    },
+    {
+      title: "Total Students",
+      value: formatNumber(totalStudents),
+      change: "+25",
+      icon: Users,
+      changeType: "positive" as const,
+    },
+    {
+      title: "Sessions Today",
+      value: formatNumber(sessionsToday),
+      change: "+3",
+      icon: TrendingUp,
+      changeType: "positive" as const,
+    },
+  ];
+
+  const stats = isAdmin ? adminStats : teacherStats;
+
   return (
     <DashboardLayout>
       <div className="space-y-6 p-4 lg:p-6">
         {/* Header Section */}
-        <div className="animate-appear flex flex-col gap-4 opacity-0 delay-100 lg:flex-row lg:items-center lg:justify-between">
+        <div className="animate-appear flex flex-col gap-4 opacity-0 delay-200 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-2">
             <h1 className="from-foreground to-muted-foreground bg-gradient-to-r bg-clip-text text-3xl font-bold text-transparent lg:text-4xl">
-              {getTimeBasedGreeting()}
+              {getTimeBasedGreeting()}, {user?.name}
             </h1>
             <p className="text-muted-foreground text-sm lg:text-base">
-              Welcome back to your attendance dashboard. Here&apos;s what&apos;s
-              happening today.
+              Welcome back to your {isAdmin ? "admin" : "attendance"} dashboard.
+              Here&apos;s what&apos;s happening today.
             </p>
           </div>
+
+          {/* Floating Action Buttons */}
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-border/50 bg-card/50 hover:bg-card/80 backdrop-blur-sm"
-            >
-              <Filter className="mr-2 h-4 w-4" />
-              Filter
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-border/50 bg-card/50 hover:bg-card/80 backdrop-blur-sm"
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Export
-            </Button>
+            {isAdmin ? (
+              <>
+                <Button
+                  onClick={() => router.push("/lecturers/create")}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg transition-all duration-300 hover:shadow-xl"
+                  size="sm"
+                >
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Create Lecturer
+                </Button>
+                <Button
+                  onClick={() => router.push("/course/create")}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg transition-all duration-300 hover:shadow-xl"
+                  size="sm"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Course
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  onClick={() => setShowCourseSelectionModal(true)}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg transition-all duration-300 hover:shadow-xl"
+                  size="sm"
+                >
+                  <Play className="mr-2 h-4 w-4" />
+                  Start Session
+                </Button>
+                <Button
+                  onClick={() => router.push("/course/create")}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg transition-all duration-300 hover:shadow-xl"
+                  size="sm"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Course
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
         {/* Stats Grid */}
-        <div className="animate-appear grid gap-4 opacity-0 delay-200 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="animate-appear grid gap-4 opacity-0 delay-300 sm:grid-cols-2 lg:grid-cols-4">
           {stats.map((stat, index) => {
             const Icon = stat.icon;
             return (
               <Card
                 key={index}
-                className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 animate-appear opacity-0 backdrop-blur-sm transition-all duration-500 hover:shadow-lg"
-                style={{ animationDelay: `${300 + index * 100}ms` }}
+                className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 animate-appear animate-fade-in-up animate-stagger opacity-0 backdrop-blur-sm transition-all duration-500 hover:shadow-lg"
+                style={
+                  { "--stagger-delay": 6 + index * 2 } as React.CSSProperties
+                } // 300ms base + 100ms increments
               >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="group-hover:text-primary text-sm font-medium transition-colors duration-300">
@@ -201,89 +277,8 @@ export default function DashboardPage() {
           })}
         </div>
 
-        {/* Quick Actions */}
-        <div className="animate-appear opacity-0 delay-500">
-          <Card className="border-border/50 bg-card/50 hover:border-border hover:bg-card/80 backdrop-blur-sm transition-all duration-300">
-            <CardHeader>
-              <CardTitle className="text-base lg:text-lg">
-                Quick Actions
-              </CardTitle>
-              <CardDescription className="text-xs lg:text-sm">
-                Common tasks and shortcuts
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <Button
-                  onClick={() => router.push("/course/create")}
-                  className="flex h-auto flex-col gap-2 p-4 text-left"
-                  variant="outline"
-                >
-                  <div className="bg-primary/10 text-primary rounded-lg p-2">
-                    <BookOpen className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <div className="font-medium">Create Course</div>
-                    <div className="text-muted-foreground text-xs">
-                      Add a new course
-                    </div>
-                  </div>
-                </Button>
-
-                <Button
-                  onClick={() => setShowCourseSelectionModal(true)}
-                  className="flex h-auto flex-col gap-2 p-4 text-left"
-                  variant="outline"
-                >
-                  <div className="bg-primary/10 text-primary rounded-lg p-2">
-                    <Clock className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <div className="font-medium">Start Session</div>
-                    <div className="text-muted-foreground text-xs">
-                      Begin attendance
-                    </div>
-                  </div>
-                </Button>
-
-                <Button
-                  onClick={() => router.push("/dashboard/students/add")}
-                  className="flex h-auto flex-col gap-2 p-4 text-left"
-                  variant="outline"
-                >
-                  <div className="bg-primary/10 text-primary rounded-lg p-2">
-                    <Users className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <div className="font-medium">Add Students</div>
-                    <div className="text-muted-foreground text-xs">
-                      Enroll students
-                    </div>
-                  </div>
-                </Button>
-
-                <Button
-                  onClick={() => router.push("/dashboard/reports")}
-                  className="flex h-auto flex-col gap-2 p-4 text-left"
-                  variant="outline"
-                >
-                  <div className="bg-primary/10 text-primary rounded-lg p-2">
-                    <Download className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <div className="font-medium">Generate Report</div>
-                    <div className="text-muted-foreground text-xs">
-                      Export data
-                    </div>
-                  </div>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
         {/* Main Content Grid */}
-        <div className="animate-appear grid gap-4 opacity-0 delay-700 md:gap-6 lg:grid-cols-3 xl:grid-cols-3">
+        <div className="animate-appear grid gap-4 opacity-0 delay-300 md:gap-6 lg:grid-cols-3 xl:grid-cols-3">
           {/* Recent Activity */}
           <Card className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 backdrop-blur-sm transition-all duration-500 lg:col-span-2 xl:col-span-2">
             <CardHeader className="pb-3">
@@ -294,54 +289,60 @@ export default function DashboardPage() {
                 Recent Activity
               </CardTitle>
               <CardDescription className="text-xs lg:text-sm">
-                Latest check-ins and check-outs from your students
+                {isAdmin
+                  ? "Latest system activities and user actions"
+                  : "Latest activities from your courses"}
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
               <div className="space-y-3 lg:space-y-4">
-                {recentActivity.map((activity) => (
-                  <div
-                    key={activity.id}
-                    className="border-border/30 bg-background/30 hover:bg-background/50 flex flex-col justify-between gap-3 rounded-lg border p-3 transition-all duration-300 sm:flex-row sm:items-center sm:gap-0"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-9 w-9">
-                        <AvatarFallback>
-                          {activity.student
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="text-sm font-medium">
-                          {activity.student}
-                        </p>
-                        <p className="text-muted-foreground flex items-center gap-1 text-xs">
-                          <MapPin className="h-3 w-3" />
-                          {activity.location}
+                {recentActivities.length > 0 ? (
+                  recentActivities.map((activity) => (
+                    <div
+                      key={activity._id}
+                      className="border-border/30 bg-background/30 hover:bg-background/50 flex flex-col justify-between gap-3 rounded-lg border p-3 transition-all duration-300 sm:flex-row sm:items-center sm:gap-0"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-9 w-9">
+                          <AvatarFallback>
+                            {activity.actor_id
+                              ? activity.actor_id.name
+                                  .split(" ")
+                                  .map((n: string) => n[0])
+                                  .join("")
+                              : "SYS"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="text-sm font-medium">
+                            {activity.actor_id
+                              ? activity.actor_id.name
+                              : "System"}
+                          </p>
+                          <p className="text-muted-foreground flex items-center gap-1 text-xs">
+                            <Activity className="h-3 w-3" />
+                            {activity.action.replace(/_/g, " ")}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <Badge variant="outline" className="mb-1">
+                          {activity.action}
+                        </Badge>
+                        <p className="text-muted-foreground text-xs">
+                          {new Date(activity.created_at).toLocaleTimeString()}
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <Badge
-                        variant={
-                          activity.status === "present"
-                            ? "default"
-                            : activity.status === "late"
-                              ? "destructive"
-                              : "secondary"
-                        }
-                        className="mb-1"
-                      >
-                        {activity.action}
-                      </Badge>
-                      <p className="text-muted-foreground text-xs">
-                        {activity.time}
-                      </p>
-                    </div>
+                  ))
+                ) : (
+                  <div className="py-8 text-center">
+                    <Activity className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
+                    <p className="text-muted-foreground">
+                      No recent activities
+                    </p>
                   </div>
-                ))}
+                )}
               </div>
             </CardContent>
           </Card>
@@ -367,110 +368,116 @@ export default function DashboardPage() {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground text-sm">
-                  Total Check-ins
+                  {isAdmin ? "Total Teachers" : "My Courses"}
                 </span>
-                <span className="font-medium">1,089</span>
+                <span className="font-medium">
+                  {isAdmin ? totalTeachers : totalCourses}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground text-sm">
-                  Late Arrivals
+                  {isAdmin ? "Total Courses" : "Active Sessions"}
                 </span>
-                <span className="font-medium text-orange-600">23</span>
+                <span className="font-medium text-green-600">
+                  {isAdmin ? totalCourses : activeSessions}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground text-sm">
-                  Early Departures
+                  Total Students
                 </span>
-                <span className="font-medium text-red-600">8</span>
+                <span className="font-medium">{totalStudents}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground text-sm">Absent</span>
-                <span className="font-medium text-red-600">145</span>
+                <span className="text-muted-foreground text-sm">
+                  {isAdmin ? "Recent Activities" : "Total Sessions"}
+                </span>
+                <span className="font-medium">
+                  {isAdmin ? recentActivities.length : totalSessions}
+                </span>
               </div>
               <Separator />
               <div className="flex items-center justify-between font-medium">
-                <span>Attendance Rate</span>
-                <span className="text-green-600">88.2%</span>
+                <span>System Status</span>
+                <span className="text-green-600">Active</span>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Student Records */}
+        {/* Courses Overview */}
         <Card className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 backdrop-blur-sm transition-all duration-500">
           <CardHeader>
             <CardTitle className="group-hover:text-primary flex items-center gap-2 transition-colors duration-300">
               <div className="bg-primary/10 text-primary group-hover:bg-primary/20 rounded-lg p-2 transition-all duration-500 group-hover:scale-110">
-                <Users className="h-5 w-5 group-hover:animate-pulse" />
+                <BookOpen className="h-5 w-5 group-hover:animate-pulse" />
               </div>
-              Student Attendance Records
+              {isAdmin ? "All Courses" : "My Courses"}
             </CardTitle>
             <CardDescription>
-              Recent attendance records from your students
+              {isAdmin
+                ? "Overview of all courses in the system"
+                : "Your current course assignments"}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {typedAttendanceData.slice(0, 10).map((record) => (
-                <div
-                  key={record.id}
-                  className="border-border/30 bg-background/30 hover:bg-background/50 flex flex-col justify-between gap-4 rounded-lg border p-4 transition-all duration-300 sm:flex-row sm:items-center"
-                >
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback>
-                        {record.student_name
-                          ? record.student_name
-                              .split(" ")
-                              .map((n: string) => n[0])
-                              .join("")
-                          : "N/A"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium">
-                        {record.student_name || "Unknown Student"}
-                      </p>
-                      <p className="text-muted-foreground text-sm">
-                        ID: {record.student_id || "N/A"} •{" "}
-                        {record.course || "No Course"}
-                      </p>
+              {courses.length > 0 ? (
+                courses.slice(0, 10).map((course) => (
+                  <div
+                    key={course._id}
+                    className="border-border/30 bg-background/30 hover:bg-background/50 flex items-center justify-between rounded-lg border p-3 transition-all duration-300"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarFallback>
+                          {course.course_code.substring(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">{course.title}</p>
+                        <p className="text-muted-foreground text-sm">
+                          {course.course_code} • Level {course.level}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <Badge variant="outline">
+                        {course.student_count || 0} students
+                      </Badge>
+                      {course.has_active_session && (
+                        <Badge variant="default" className="ml-2">
+                          Active Session
+                        </Badge>
+                      )}
                     </div>
                   </div>
-                  <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-                    <div className="text-left sm:text-right">
-                      <p className="text-sm font-medium">
-                        {record.date || "No Date"}
-                      </p>
-                      <p className="text-muted-foreground text-xs">
-                        {record.check_in_time || "No check-in"} -{" "}
-                        {record.check_out_time || "Still in"}
-                      </p>
-                    </div>
-                    <Badge
-                      variant={
-                        record.status === "Present"
-                          ? "default"
-                          : record.status === "Late"
-                            ? "destructive"
-                            : "secondary"
-                      }
-                      className="w-fit"
-                    >
-                      {record.status || "Unknown"}
-                    </Badge>
-                  </div>
+                ))
+              ) : (
+                <div className="py-8 text-center">
+                  <BookOpen className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
+                  <p className="text-muted-foreground">No courses found</p>
+                  <Button
+                    onClick={() => router.push("/course/create")}
+                    className="mt-4"
+                    variant="outline"
+                  >
+                    Create Your First Course
+                  </Button>
                 </div>
-              ))}
+              )}
             </div>
-            <div className="mt-6 text-center">
-              <Button
-                variant="outline"
-                className="border-border/50 bg-card/50 hover:bg-card/80 hover:border-primary/20 hover:text-primary backdrop-blur-sm transition-all duration-300 hover:scale-105"
-              >
-                View All Records
-              </Button>
-            </div>
+            {courses.length > 10 && (
+              <div className="mt-6 text-center">
+                <Button
+                  variant="outline"
+                  className="border-border/50 bg-card/50 hover:bg-card/80 hover:border-primary/20 hover:text-primary backdrop-blur-sm transition-all duration-300 hover:scale-105"
+                  onClick={() => router.push("/course")}
+                >
+                  View All Courses
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

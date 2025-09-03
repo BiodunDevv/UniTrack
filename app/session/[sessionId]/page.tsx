@@ -42,6 +42,7 @@ import {
   generateSessionPDF,
   generateSessionSummaryPDF,
 } from "@/lib/pdf-generator";
+import { useAuthStore } from "@/store/auth-store";
 import { useCourseStore } from "@/store/course-store";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "localhost:3000";
@@ -151,6 +152,10 @@ export default function SessionDetailPage() {
   const params = useParams();
   const router = useRouter();
   const sessionId = params.sessionId as string;
+
+  // Auth store
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === "admin";
 
   const [sessionData, setSessionData] =
     React.useState<SessionDetailResponse | null>(null);
@@ -541,29 +546,59 @@ export default function SessionDetailPage() {
         {/* Breadcrumb */}
         <div className="animate-appear opacity-0">
           <Breadcrumb
-            items={[
-              { label: "Courses", href: "/course" },
-              {
-                label: session.course_id.title,
-                href: `/course/${session.course_id._id}`,
-              },
-              { label: `Session ${session.session_code}`, current: true },
-            ]}
+            items={
+              isAdmin
+                ? [
+                    { label: "Lecturers", href: "/lecturers" },
+                    {
+                      label: session.teacher_id.name,
+                      href: `/lecturers/${session.teacher_id._id}`,
+                    },
+                    {
+                      label: session.course_id.course_code,
+                      href: `/course/${session.course_id._id}`,
+                    },
+                    {
+                      label: `${session.course_id.course_code} Sessions`,
+                      href: `/lecturers/sessions?courseId=${session.course_id._id}`,
+                    },
+                    { label: `Session ${session.session_code}`, current: true },
+                  ]
+                : [
+                    { label: "Courses", href: "/course" },
+                    {
+                      label: session.course_id.title,
+                      href: `/course/${session.course_id._id}`,
+                    },
+                    { label: `Session ${session.session_code}`, current: true },
+                  ]
+            }
           />
         </div>
 
         {/* Header */}
         <div className="animate-appear flex flex-col gap-4 opacity-0 delay-100 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.back()}
-              className="md:hidden"
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
+            {isAdmin ? (
+              <Button variant="outline" size="sm" asChild className="md:hidden">
+                <a
+                  href={`/lecturers/sessions?courseId=${session.course_id._id}`}
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Sessions
+                </a>
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.back()}
+                className="md:hidden"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back
+              </Button>
+            )}
             <div>
               <h1 className="text-2xl font-bold">Session Details</h1>
               <p className="text-muted-foreground">
@@ -573,7 +608,7 @@ export default function SessionDetailPage() {
           </div>
 
           <div className="flex gap-2">
-            {session.is_active && !session.is_expired && (
+            {!isAdmin && session.is_active && !session.is_expired && (
               <Button
                 onClick={() => router.push(`/session/${sessionId}/live`)}
                 className="bg-green-600 hover:bg-green-700"
@@ -816,7 +851,7 @@ export default function SessionDetailPage() {
               )}
 
               {/* Bulk Actions */}
-              {students.all.length > 0 && (
+              {!isAdmin && students.all.length > 0 && (
                 <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-4">
                     <span className="text-muted-foreground text-sm">
@@ -903,18 +938,20 @@ export default function SessionDetailPage() {
                         <table className="w-full">
                           <thead>
                             <tr className="border-border border-b">
-                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
-                                <input
-                                  type="checkbox"
-                                  checked={
-                                    selectedStudents.length ===
-                                      getFilteredStudents().length &&
-                                    getFilteredStudents().length > 0
-                                  }
-                                  onChange={handleSelectAllStudents}
-                                  className="rounded border-gray-300"
-                                />
-                              </th>
+                              {!isAdmin && (
+                                <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
+                                  <input
+                                    type="checkbox"
+                                    checked={
+                                      selectedStudents.length ===
+                                        getFilteredStudents().length &&
+                                      getFilteredStudents().length > 0
+                                    }
+                                    onChange={handleSelectAllStudents}
+                                    className="rounded border-gray-300"
+                                  />
+                                </th>
+                              )}
                               <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
                                 #
                               </th>
@@ -936,9 +973,11 @@ export default function SessionDetailPage() {
                               <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
                                 Location
                               </th>
-                              <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
-                                Actions
-                              </th>
+                              {!isAdmin && (
+                                <th className="text-muted-foreground px-2 py-3 text-left text-xs font-medium whitespace-nowrap">
+                                  Actions
+                                </th>
+                              )}
                             </tr>
                           </thead>
                           <tbody>
@@ -979,18 +1018,20 @@ export default function SessionDetailPage() {
                                     key={student._id}
                                     className="border-border/50 hover:bg-muted/50 border-b transition-colors"
                                   >
-                                    <td className="px-2 py-3 whitespace-nowrap">
-                                      <input
-                                        type="checkbox"
-                                        checked={selectedStudents.includes(
-                                          student._id,
-                                        )}
-                                        onChange={() =>
-                                          handleSelectStudent(student._id)
-                                        }
-                                        className="rounded border-gray-300"
-                                      />
-                                    </td>
+                                    {!isAdmin && (
+                                      <td className="px-2 py-3 whitespace-nowrap">
+                                        <input
+                                          type="checkbox"
+                                          checked={selectedStudents.includes(
+                                            student._id,
+                                          )}
+                                          onChange={() =>
+                                            handleSelectStudent(student._id)
+                                          }
+                                          className="rounded border-gray-300"
+                                        />
+                                      </td>
+                                    )}
                                     <td className="px-2 py-3 whitespace-nowrap">
                                       <div className="flex items-center gap-1">
                                         {student.attendance_status ===
@@ -1084,47 +1125,49 @@ export default function SessionDetailPage() {
                                         </p>
                                       </div>
                                     </td>
-                                    <td className="px-2 py-3 whitespace-nowrap">
-                                      <div className="flex gap-1">
-                                        {student.attendance_status ===
-                                          "absent" && (
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() =>
-                                              handleMarkAsPresent(student)
-                                            }
-                                            className="h-7 w-7 p-0 transition-all duration-200 hover:scale-105"
-                                            title="Mark as present manually"
-                                          >
-                                            <UserCheck className="h-3 w-3" />
-                                          </Button>
-                                        )}
-                                        {(student.attendance_status ===
-                                          "present" ||
-                                          student.attendance_status ===
-                                            "manual_present") && (
-                                          <Button
-                                            variant="destructive"
-                                            size="sm"
-                                            onClick={() =>
-                                              handleMarkAsAbsent(student)
-                                            }
-                                            className="h-7 w-7 p-0 transition-all duration-200 hover:scale-105"
-                                            title="Mark as absent manually"
-                                          >
-                                            <X className="h-3 w-3" />
-                                          </Button>
-                                        )}
-                                      </div>
-                                    </td>
+                                    {!isAdmin && (
+                                      <td className="px-2 py-3 whitespace-nowrap">
+                                        <div className="flex gap-1">
+                                          {student.attendance_status ===
+                                            "absent" && (
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() =>
+                                                handleMarkAsPresent(student)
+                                              }
+                                              className="h-7 w-7 p-0 transition-all duration-200 hover:scale-105"
+                                              title="Mark as present manually"
+                                            >
+                                              <UserCheck className="h-3 w-3" />
+                                            </Button>
+                                          )}
+                                          {(student.attendance_status ===
+                                            "present" ||
+                                            student.attendance_status ===
+                                              "manual_present") && (
+                                            <Button
+                                              variant="destructive"
+                                              size="sm"
+                                              onClick={() =>
+                                                handleMarkAsAbsent(student)
+                                              }
+                                              className="h-7 w-7 p-0 transition-all duration-200 hover:scale-105"
+                                              title="Mark as absent manually"
+                                            >
+                                              <X className="h-3 w-3" />
+                                            </Button>
+                                          )}
+                                        </div>
+                                      </td>
+                                    )}
                                   </tr>
                                 );
                               })
                             ) : (
                               <tr>
                                 <td
-                                  colSpan={9}
+                                  colSpan={isAdmin ? 8 : 9}
                                   className="px-4 py-8 text-center"
                                 >
                                   <p className="text-muted-foreground text-sm">
@@ -1147,18 +1190,20 @@ export default function SessionDetailPage() {
                       <table className="w-full">
                         <thead>
                           <tr className="border-border border-b">
-                            <th className="text-muted-foreground w-12 px-4 py-3 text-left text-sm font-medium">
-                              <input
-                                type="checkbox"
-                                checked={
-                                  selectedStudents.length ===
-                                    getFilteredStudents().length &&
-                                  getFilteredStudents().length > 0
-                                }
-                                onChange={handleSelectAllStudents}
-                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                              />
-                            </th>
+                            {!isAdmin && (
+                              <th className="text-muted-foreground w-12 px-4 py-3 text-left text-sm font-medium">
+                                <input
+                                  type="checkbox"
+                                  checked={
+                                    selectedStudents.length ===
+                                      getFilteredStudents().length &&
+                                    getFilteredStudents().length > 0
+                                  }
+                                  onChange={handleSelectAllStudents}
+                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                              </th>
+                            )}
                             <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
                               #
                             </th>
@@ -1180,9 +1225,11 @@ export default function SessionDetailPage() {
                             <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
                               Location
                             </th>
-                            <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
-                              Actions
-                            </th>
+                            {!isAdmin && (
+                              <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
+                                Actions
+                              </th>
+                            )}
                           </tr>
                         </thead>
                         <tbody>
@@ -1223,18 +1270,20 @@ export default function SessionDetailPage() {
                                   key={student._id}
                                   className="border-border/50 hover:bg-muted/50 border-b transition-colors"
                                 >
-                                  <td className="px-4 py-4">
-                                    <input
-                                      type="checkbox"
-                                      checked={selectedStudents.includes(
-                                        student._id,
-                                      )}
-                                      onChange={() =>
-                                        handleSelectStudent(student._id)
-                                      }
-                                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                    />
-                                  </td>
+                                  {!isAdmin && (
+                                    <td className="px-4 py-4">
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedStudents.includes(
+                                          student._id,
+                                        )}
+                                        onChange={() =>
+                                          handleSelectStudent(student._id)
+                                        }
+                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                      />
+                                    </td>
+                                  )}
                                   <td className="px-4 py-4">
                                     <div className="flex items-center gap-2">
                                       {student.attendance_status ===
@@ -1338,46 +1387,51 @@ export default function SessionDetailPage() {
                                       </p>
                                     </div>
                                   </td>
-                                  <td className="px-4 py-4">
-                                    <div className="flex gap-2">
-                                      {student.attendance_status ===
-                                        "absent" && (
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() =>
-                                            handleMarkAsPresent(student)
-                                          }
-                                          className="h-8 w-8 p-0 transition-all duration-200 hover:scale-105"
-                                          title="Mark as present manually"
-                                        >
-                                          <UserCheck className="h-4 w-4" />
-                                        </Button>
-                                      )}
-                                      {(student.attendance_status ===
-                                        "present" ||
-                                        student.attendance_status ===
-                                          "manual_present") && (
-                                        <Button
-                                          variant="destructive"
-                                          size="sm"
-                                          onClick={() =>
-                                            handleMarkAsAbsent(student)
-                                          }
-                                          className="h-8 w-8 p-0 transition-all duration-200 hover:scale-105"
-                                          title="Mark as absent manually"
-                                        >
-                                          <X className="h-4 w-4" />
-                                        </Button>
-                                      )}
-                                    </div>
-                                  </td>
+                                  {!isAdmin && (
+                                    <td className="px-4 py-4">
+                                      <div className="flex gap-2">
+                                        {student.attendance_status ===
+                                          "absent" && (
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() =>
+                                              handleMarkAsPresent(student)
+                                            }
+                                            className="h-8 w-8 p-0 transition-all duration-200 hover:scale-105"
+                                            title="Mark as present manually"
+                                          >
+                                            <UserCheck className="h-4 w-4" />
+                                          </Button>
+                                        )}
+                                        {(student.attendance_status ===
+                                          "present" ||
+                                          student.attendance_status ===
+                                            "manual_present") && (
+                                          <Button
+                                            variant="destructive"
+                                            size="sm"
+                                            onClick={() =>
+                                              handleMarkAsAbsent(student)
+                                            }
+                                            className="h-8 w-8 p-0 transition-all duration-200 hover:scale-105"
+                                            title="Mark as absent manually"
+                                          >
+                                            <X className="h-4 w-4" />
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </td>
+                                  )}
                                 </tr>
                               );
                             })
                           ) : (
                             <tr>
-                              <td colSpan={9} className="px-4 py-8 text-center">
+                              <td
+                                colSpan={isAdmin ? 7 : 9}
+                                className="px-4 py-8 text-center"
+                              >
                                 <p className="text-muted-foreground text-sm">
                                   {searchQuery || statusFilter !== "all"
                                     ? "No students found matching your search criteria"

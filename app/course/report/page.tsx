@@ -23,7 +23,7 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import * as React from "react";
-import { CartesianGrid, Line, LineChart, XAxis } from "recharts";
+import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
 import { toast } from "sonner";
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
@@ -40,6 +40,8 @@ import {
 import {
   ChartConfig,
   ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
@@ -48,12 +50,17 @@ import { Pagination } from "@/components/ui/pagination";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { generateCourseAttendanceReportPDF } from "@/lib/pdf-generator";
+import { useAuthStore } from "@/store/auth-store";
 import { useCourseStore } from "@/store/course-store";
 
 function CourseAttendanceReportPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const courseId = searchParams.get("courseId");
+
+  // Auth store
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === "admin";
 
   const {
     attendanceReport,
@@ -87,7 +94,6 @@ function CourseAttendanceReportPage() {
       getCourseAttendanceReport(courseId);
     }
   }, [courseId, getCourse, getCourseAttendanceReport]);
-
 
   // Format date with day of week
   const formatDateWithDay = (dateString: string) => {
@@ -305,14 +311,29 @@ function CourseAttendanceReportPage() {
         {/* Breadcrumb */}
         <div className="animate-appear opacity-0">
           <Breadcrumb
-            items={[
-              { label: "Courses", href: "/course" },
-              {
-                label: currentCourse.title,
-                href: `/course/${courseId}`,
-              },
-              { label: "Attendance Report", current: true },
-            ]}
+            items={
+              isAdmin
+                ? [
+                    { label: "Lecturers", href: "/lecturers" },
+                    {
+                      label: currentCourse.teacher_id?.name || "Lecturer",
+                      href: `/lecturers/${currentCourse.teacher_id?._id}`,
+                    },
+                    {
+                      label: currentCourse.title,
+                      href: `/course/${courseId}`,
+                    },
+                    { label: "Attendance Report", current: true },
+                  ]
+                : [
+                    { label: "Courses", href: "/course" },
+                    {
+                      label: currentCourse.title,
+                      href: `/course/${courseId}`,
+                    },
+                    { label: "Attendance Report", current: true },
+                  ]
+            }
           />
         </div>
 
@@ -323,11 +344,12 @@ function CourseAttendanceReportPage() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => router.push(`/course/${courseId}`)}
-                className="hover:bg-accent hover:text-accent-foreground transition-all duration-300 hover:scale-105"
+                className="hover:bg-accent hover:text-accent-foreground transition-all duration-300 md:hidden"
               >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Course
+                <a href={`/course/${courseId}`}>
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Course
+                </a>
               </Button>
             </div>
             <h1 className="from-foreground to-muted-foreground bg-gradient-to-r bg-clip-text text-3xl font-bold text-transparent lg:text-4xl">
@@ -570,20 +592,69 @@ function CourseAttendanceReportPage() {
                     })}
                   </div>
                 </CardHeader>
-                <CardContent className="px-2 sm:p-6">
+                <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
                   {sessionsChartData.length > 0 ? (
                     <ChartContainer
                       config={chartConfig}
-                      className="aspect-auto h-[250px] w-full"
+                      className="aspect-auto h-[300px] w-full"
                     >
-                      <LineChart
-                        accessibilityLayer
-                        data={sessionsChartData}
-                        margin={{
-                          left: 12,
-                          right: 12,
-                        }}
-                      >
+                      <AreaChart data={sessionsChartData}>
+                        <defs>
+                          <linearGradient
+                            id="fillPresent"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="5%"
+                              stopColor="var(--color-present)"
+                              stopOpacity={0.8}
+                            />
+                            <stop
+                              offset="95%"
+                              stopColor="var(--color-present)"
+                              stopOpacity={0.1}
+                            />
+                          </linearGradient>
+                          <linearGradient
+                            id="fillAbsent"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="5%"
+                              stopColor="var(--color-absent)"
+                              stopOpacity={0.8}
+                            />
+                            <stop
+                              offset="95%"
+                              stopColor="var(--color-absent)"
+                              stopOpacity={0.1}
+                            />
+                          </linearGradient>
+                          <linearGradient
+                            id="fillAttendanceRate"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="5%"
+                              stopColor="var(--color-attendance_rate)"
+                              stopOpacity={0.8}
+                            />
+                            <stop
+                              offset="95%"
+                              stopColor="var(--color-attendance_rate)"
+                              stopOpacity={0.1}
+                            />
+                          </linearGradient>
+                        </defs>
                         <CartesianGrid vertical={false} />
                         <XAxis
                           dataKey="session"
@@ -596,10 +667,9 @@ function CourseAttendanceReportPage() {
                           }}
                         />
                         <ChartTooltip
+                          cursor={false}
                           content={
                             <ChartTooltipContent
-                              className="w-[200px]"
-                              nameKey="views"
                               labelFormatter={(value) => {
                                 const sessionData = sessionsChartData.find(
                                   (d) => d.session === value,
@@ -609,29 +679,42 @@ function CourseAttendanceReportPage() {
                                 }
                                 return value;
                               }}
+                              indicator="dot"
                             />
                           }
                         />
-                        <Line
-                          dataKey={activeChart}
-                          type="monotone"
-                          stroke={chartConfig[activeChart].color}
-                          strokeWidth={2}
-                          dot={{
-                            fill: chartConfig[activeChart].color,
-                            strokeWidth: 2,
-                            r: 4,
-                          }}
-                          activeDot={{
-                            r: 6,
-                            stroke: chartConfig[activeChart].color,
-                            strokeWidth: 2,
-                          }}
-                        />
-                      </LineChart>
+                        {activeChart === "present" && (
+                          <Area
+                            dataKey="present"
+                            type="natural"
+                            fill="url(#fillPresent)"
+                            stroke="var(--color-present)"
+                            stackId="a"
+                          />
+                        )}
+                        {activeChart === "absent" && (
+                          <Area
+                            dataKey="absent"
+                            type="natural"
+                            fill="url(#fillAbsent)"
+                            stroke="var(--color-absent)"
+                            stackId="a"
+                          />
+                        )}
+                        {activeChart === "attendance_rate" && (
+                          <Area
+                            dataKey="attendance_rate"
+                            type="natural"
+                            fill="url(#fillAttendanceRate)"
+                            stroke="var(--color-attendance_rate)"
+                            stackId="a"
+                          />
+                        )}
+                        <ChartLegend content={<ChartLegendContent />} />
+                      </AreaChart>
                     </ChartContainer>
                   ) : (
-                    <div className="text-muted-foreground flex h-[250px] items-center justify-center">
+                    <div className="text-muted-foreground flex h-[300px] items-center justify-center">
                       No session data available
                     </div>
                   )}

@@ -32,6 +32,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { generateStudentAttendanceReportPDF } from "@/lib/pdf-generator";
+import { useAuthStore } from "@/store/auth-store";
 
 // Types
 interface Student {
@@ -148,6 +149,10 @@ export default function StudentAttendancePage() {
   const router = useRouter();
   const courseId = params.courseId as string;
   const studentId = params.studentId as string;
+
+  // Auth store
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === "admin";
 
   const [attendanceData, setAttendanceData] = useState<AttendanceData | null>(
     null,
@@ -302,12 +307,25 @@ export default function StudentAttendancePage() {
         {/* Breadcrumb */}
         <div className="animate-appear opacity-0">
           <Breadcrumb
-            items={[
-              { label: "Courses", href: "/course" },
-              { label: course.title, href: `/course/${courseId}` },
-              { label: "Students", href: `/students/${courseId}` },
-              { label: "Attendance History", current: true },
-            ]}
+            items={
+              isAdmin && attendanceData?.course.teacher_id
+                ? [
+                    { label: "Lecturers", href: "/lecturers" },
+                    {
+                      label: "Lecturer Profile",
+                      href: `/lecturers/${attendanceData.course.teacher_id}`,
+                    },
+                    { label: course.title, href: `/course/${courseId}` },
+                    { label: "Students", href: `/students/${courseId}` },
+                    { label: "Attendance History", current: true },
+                  ]
+                : [
+                    { label: "Courses", href: "/course" },
+                    { label: course.title, href: `/course/${courseId}` },
+                    { label: "Students", href: `/students/${courseId}` },
+                    { label: "Attendance History", current: true },
+                  ]
+            }
           />
         </div>
 

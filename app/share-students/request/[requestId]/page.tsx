@@ -26,6 +26,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useAuthStore } from "@/store/auth-store";
 
 interface RequestDetails {
   _id: string;
@@ -67,6 +68,10 @@ export default function RequestDetailsPage() {
   const router = useRouter();
   const params = useParams();
   const requestId = params.requestId as string;
+
+  // Auth store
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === "admin";
 
   const [requestDetails, setRequestDetails] =
     React.useState<RequestDetails | null>(null);
@@ -227,10 +232,18 @@ export default function RequestDetailsPage() {
         {/* Breadcrumb */}
         <div className="animate-appear opacity-0">
           <Breadcrumb
-            items={[
-              { label: "Share Students", href: "/share-students" },
-              { label: "Request Details", current: true },
-            ]}
+            items={
+              isAdmin
+                ? [
+                    { label: "Lecturers", href: "/lecturers" },
+                    { label: "Share Students", href: "/share-students" },
+                    { label: "Request Details", current: true },
+                  ]
+                : [
+                    { label: "Share Students", href: "/share-students" },
+                    { label: "Request Details", current: true },
+                  ]
+            }
           />
         </div>
         <Button
@@ -331,13 +344,12 @@ export default function RequestDetailsPage() {
               {requestDetails.student_ids.map((student, index) => (
                 <div
                   key={student._id}
-                  className="border-border/50 bg-background/50 rounded-lg border p-3 backdrop-blur-sm"
-                  style={{
-                    animationDelay: `${index * 100}ms`,
-                    animation: "fadeInUp 0.4s ease-out forwards",
-                    opacity: 0,
-                    transform: "translateY(10px)",
-                  }}
+                  className="border-border/50 bg-background/50 animate-fade-in-up animate-stagger rounded-lg border p-3 backdrop-blur-sm"
+                  style={
+                    {
+                      "--stagger-delay": index * 2, // Using 2x for 100ms delay instead of 50ms
+                    } as React.CSSProperties
+                  }
                 >
                   <div className="space-y-1">
                     <p className="font-medium">{student.name}</p>

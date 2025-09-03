@@ -449,16 +449,12 @@ function ShareStudentsContent() {
                       {paginatedTeachers.map((teacher, index) => (
                         <Card
                           key={teacher._id}
-                          className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 cursor-pointer backdrop-blur-sm transition-all duration-300 hover:shadow-lg"
-                          style={{
-                            animationName: "fadeInUp",
-                            animationDuration: "0.4s",
-                            animationTimingFunction: "ease-out",
-                            animationFillMode: "forwards",
-                            animationDelay: `${index * 50}ms`,
-                            opacity: 0,
-                            transform: "translateY(10px)",
-                          }}
+                          className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 animate-fade-in-up animate-stagger cursor-pointer backdrop-blur-sm transition-all duration-300 hover:shadow-lg"
+                          style={
+                            {
+                              "--stagger-delay": index,
+                            } as React.CSSProperties
+                          }
                           onClick={() => handleTeacherClick(teacher._id)}
                         >
                           <CardHeader className="pb-3">
@@ -555,16 +551,12 @@ function ShareStudentsContent() {
                         (request: ShareRequest, index) => (
                           <Card
                             key={request._id}
-                            className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 backdrop-blur-sm transition-all duration-300 hover:shadow-lg"
-                            style={{
-                              animationName: "fadeInUp",
-                              animationDuration: "0.4s",
-                              animationTimingFunction: "ease-out",
-                              animationFillMode: "forwards",
-                              animationDelay: `${index * 50}ms`,
-                              opacity: 0,
-                              transform: "translateY(10px)",
-                            }}
+                            className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 animate-fade-in-up animate-stagger backdrop-blur-sm transition-all duration-300 hover:shadow-lg"
+                            style={
+                              {
+                                "--stagger-delay": index,
+                              } as React.CSSProperties
+                            }
                           >
                             <CardHeader className="pb-3">
                               <div className="flex items-start justify-between">
@@ -735,16 +727,12 @@ function ShareStudentsContent() {
                         (request: ShareRequest, index) => (
                           <Card
                             key={request._id}
-                            className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 backdrop-blur-sm transition-all duration-300 hover:shadow-lg"
-                            style={{
-                              animationName: "fadeInUp",
-                              animationDuration: "0.4s",
-                              animationTimingFunction: "ease-out",
-                              animationFillMode: "forwards",
-                              animationDelay: `${index * 50}ms`,
-                              opacity: 0,
-                              transform: "translateY(10px)",
-                            }}
+                            className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 animate-fade-in-up animate-stagger backdrop-blur-sm transition-all duration-300 hover:shadow-lg"
+                            style={
+                              {
+                                "--stagger-delay": index,
+                              } as React.CSSProperties
+                            }
                           >
                             <CardHeader className="pb-3">
                               <div className="flex items-start justify-between">

@@ -3,6 +3,7 @@
 import { type LucideIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useAuthStore } from "@/store/auth-store";
 
 export function NavMain({
   items,
@@ -20,11 +21,13 @@ export function NavMain({
   }[];
   onLinkClick?: () => void;
 }) {
+  const { user } = useAuthStore();
+
   return (
     <div className="space-y-1">
       <div className="px-3 py-2">
         <h2 className="text-muted-foreground/80 text-xs font-medium tracking-wider uppercase">
-          UniTrack Platform
+          {user?.role === "admin" ? "Admin Panel" : "UniTrack Platform"}
         </h2>
       </div>
       <div className="space-y-1">

@@ -17,6 +17,7 @@ import {
   Settings,
   Square,
   Trash2,
+  UserCheck,
   Users,
   X,
 } from "lucide-react";
@@ -88,6 +89,10 @@ export default function CoursePage() {
   } = useCourseStore();
 
   const { user } = useAuthStore();
+
+  // Check if user is admin
+  const isAdmin = user?.role === "admin";
+
   const [activeTab, setActiveTab] = React.useState("overview");
   const [showEndSessionModal, setShowEndSessionModal] = React.useState(false);
   const [sessionToEnd, setSessionToEnd] = React.useState<{
@@ -370,6 +375,9 @@ export default function CoursePage() {
     studentEndIndex,
   );
 
+  const actualLecturerId = currentCourse?.teacher_id?._id;
+  const actualLecturerName = currentCourse?.teacher_id?.name;
+
   // Reset student pagination when search query changes
   React.useEffect(() => {
     setCurrentStudentPage(1);
@@ -391,7 +399,7 @@ export default function CoursePage() {
   if (error) {
     return (
       <DashboardLayout>
-        <div className="flex flex-1 items-center justify-center">
+        <div className="flex min-h-screen flex-1 items-center justify-center">
           <div className="text-center">
             <p className="mb-4 text-red-500">{error}</p>
             <Button onClick={() => clearError()}>Try Again</Button>
@@ -407,9 +415,7 @@ export default function CoursePage() {
         <div className="flex flex-1 items-center justify-center">
           <div className="text-center">
             <p className="text-muted-foreground mb-4">Course not found</p>
-            <Button onClick={() => router.push("/dashboard")}>
-              Go to Dashboard
-            </Button>
+            <Button href="/dashboard">Go to Dashboard</Button>
           </div>
         </div>
       </DashboardLayout>
@@ -422,10 +428,21 @@ export default function CoursePage() {
         {/* Breadcrumb */}
         <div className="animate-appear opacity-0">
           <Breadcrumb
-            items={[
-              { label: "Courses", href: "/course" },
-              { label: currentCourse.title, current: true },
-            ]}
+            items={
+              isAdmin
+                ? [
+                    { label: "Lecturers", href: "/lecturers" },
+                    {
+                      label: actualLecturerName || "Unknown Lecturer",
+                      href: `/lecturers/${actualLecturerId}`,
+                    },
+                    { label: currentCourse.course_code, current: true },
+                  ]
+                : [
+                    { label: "Courses", href: "/course" },
+                    { label: currentCourse.course_code, current: true },
+                  ]
+            }
           />
         </div>
 
@@ -436,11 +453,11 @@ export default function CoursePage() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => router.push(`/course`)}
+                href={isAdmin ? `/lecturers/${actualLecturerId}` : `/course`}
                 className="hover:bg-accent hover:text-accent-foreground transition-all duration-300 md:hidden"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Courses
+                {isAdmin ? "Back to Lecturer" : "Back to Courses"}
               </Button>
             </div>
             <h1 className="from-foreground to-muted-foreground bg-gradient-to-r bg-clip-text text-3xl font-bold text-transparent lg:text-4xl">
@@ -452,11 +469,11 @@ export default function CoursePage() {
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            {/* Show View Live and Stop Session buttons if there are active sessions */}
-            {sessions.some(
-              (session) => session.is_active || session.status === "active",
-            ) && (
-              <>
+            {/* Show View Live Session button for teachers only when there are active sessions */}
+            {!isAdmin &&
+              sessions.some(
+                (session) => session.is_active || session.status === "active",
+              ) && (
                 <Button
                   onClick={() => {
                     const activeSession = sessions.find(
@@ -472,6 +489,36 @@ export default function CoursePage() {
                   <Activity className="mr-2 h-4 w-4" />
                   View Live Session
                 </Button>
+              )}
+
+            {/* Show View All Sessions button for admin */}
+            {isAdmin && currentCourse?.teacher_id?._id && (
+              <Button
+                href={`/lecturers/sessions?courseId=${courseId}`}
+                variant="outline"
+              >
+                <Activity className="mr-2 h-4 w-4" />
+                View All Sessions
+              </Button>
+            )}
+
+            {/* Show Reassign Course button for admin only */}
+            {isAdmin && currentCourse && (
+              <Button
+                href={`/course/reassign?courseId=${courseId}`}
+                variant="glow"
+                className="border-border/50 bg-background/50 transition-all duration-300 hover:bg-orange-600 hover:text-white hover:shadow-lg hover:shadow-orange-600/20"
+              >
+                <UserCheck className="mr-2 h-4 w-4" />
+                Reassign Course
+              </Button>
+            )}
+
+            {/* Show Stop Session button only for teachers */}
+            {!isAdmin &&
+              sessions.some(
+                (session) => session.is_active || session.status === "active",
+              ) && (
                 <Button
                   onClick={() => {
                     const activeSession = sessions.find(
@@ -488,88 +535,114 @@ export default function CoursePage() {
                   <Square className="mr-2 h-4 w-4" />
                   Stop Session
                 </Button>
-              </>
-            )}
+              )}
 
-            {/* Hide Add Students and Edit Course buttons when session is active */}
+            {/* Show Students button for both admin and teachers when no active session */}
             {!sessions.some(
               (session) => session.is_active || session.status === "active",
             ) && (
-              <>
-                <Button
-                  onClick={() => router.push(`/students/${courseId}`)}
-                  variant="outline"
-                  className="border-border/50 bg-background/50 transition-all duration-300 hover:bg-purple-600 hover:text-white hover:shadow-lg hover:shadow-purple-600/20"
-                  disabled={isLoading}
-                >
-                  <Users className="mr-2 h-4 w-4" />
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Loading...
-                    </>
-                  ) : stats?.total_students === 0 || students.length === 0 ? (
-                    "Add Students"
-                  ) : stats?.total_students === 1 || students.length === 1 ? (
-                    "View Student"
-                  ) : (
+              <Button
+                href={`/students/${courseId}`}
+                variant="outline"
+                className="border-border/50 bg-background/50 transition-all duration-300 hover:bg-purple-600 hover:text-white hover:shadow-lg hover:shadow-purple-600/20"
+              >
+                <Users className="mr-2 h-4 w-4" />
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : stats?.total_students === 0 || students.length === 0 ? (
+                  isAdmin ? (
                     "View Students"
-                  )}
-                </Button>
-                <Button
-                  onClick={() =>
-                    router.push(`/course/report?courseId=${courseId}`)
-                  }
-                  variant="outline"
-                  className="border-border/50 bg-background/50 transition-all duration-300 hover:bg-blue-600 hover:text-white hover:shadow-lg hover:shadow-blue-600/20"
-                  disabled={isLoading}
-                >
-                  <BarChart3 className="mr-2 h-4 w-4" />
-                  Attendance Report
-                </Button>
-                <Button
-                  onClick={() => setShowUpdateCourseModal(true)}
-                  variant="outline"
-                  className="border-border/50 bg-background/50 transition-all duration-300 hover:bg-orange-600 hover:text-white hover:shadow-lg hover:shadow-orange-600/20"
-                  disabled={isLoading}
-                >
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit Course
-                </Button>
-              </>
+                  ) : (
+                    "Add Students"
+                  )
+                ) : stats?.total_students === 1 || students.length === 1 ? (
+                  "View Student"
+                ) : (
+                  "View Students"
+                )}
+              </Button>
             )}
 
-            <Button
-              variant={
-                sessions.some(
-                  (session) => session.is_active || session.status === "active",
-                )
-                  ? "destructive"
-                  : "default"
-              }
-              onClick={() =>
-                router.push(
-                  `/session/start?courseId=${courseId}&courseName=${encodeURIComponent(currentCourse?.title || "Course")}`,
-                )
-              }
-              className="transition-all duration-300"
-              disabled={
-                isLoading ||
-                sessions.some(
-                  (session) => session.is_active || session.status === "active",
-                )
-              }
-            >
-              <Play className="mr-2 h-4 w-4" />
-              {isLoading
-                ? "Loading..."
-                : sessions.some(
-                      (session) =>
-                        session.is_active || session.status === "active",
-                    )
-                  ? "Session Active"
-                  : "Start Session"}
-            </Button>
+            {/* Hide Edit Course and Report buttons when session is active OR when user is admin */}
+            {!isAdmin &&
+              !sessions.some(
+                (session) => session.is_active || session.status === "active",
+              ) && (
+                <>
+                  <Button
+                    href={`/course/report?courseId=${courseId}`}
+                    variant="outline"
+                    className="border-border/50 bg-background/50 transition-all duration-300 hover:bg-blue-600 hover:text-white hover:shadow-lg hover:shadow-blue-600/20"
+                  >
+                    <BarChart3 className="mr-2 h-4 w-4" />
+                    Attendance Report
+                  </Button>
+                  <Button
+                    onClick={() => setShowUpdateCourseModal(true)}
+                    variant="outline"
+                    className="border-border/50 bg-background/50 transition-all duration-300 hover:bg-orange-600 hover:text-white hover:shadow-lg hover:shadow-orange-600/20"
+                    disabled={isLoading}
+                  >
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit Course
+                  </Button>
+                </>
+              )}
+
+            {/* Admin gets read-only access to reports */}
+            {isAdmin && (
+              <Button
+                href={`/course/report?courseId=${courseId}`}
+                className="transition-all duration-300"
+              >
+                <BarChart3 className="mr-2 h-4 w-4" />
+                View Report
+              </Button>
+            )}
+
+            {/* Start Session button only for teachers */}
+            {!isAdmin && (
+              <Button
+                variant={
+                  sessions.some(
+                    (session) =>
+                      session.is_active || session.status === "active",
+                  )
+                    ? "destructive"
+                    : "default"
+                }
+                href={
+                  !isLoading &&
+                  !sessions.some(
+                    (session) =>
+                      session.is_active || session.status === "active",
+                  )
+                    ? `/session/start?courseId=${courseId}&courseName=${encodeURIComponent(currentCourse?.title || "Course")}`
+                    : undefined
+                }
+                className="transition-all duration-300"
+                disabled={
+                  isLoading ||
+                  sessions.some(
+                    (session) =>
+                      session.is_active || session.status === "active",
+                  )
+                }
+              >
+                <Play className="mr-2 h-4 w-4" />
+                {isLoading
+                  ? "Loading..."
+                  : sessions.some(
+                        (session) =>
+                          session.is_active || session.status === "active",
+                      )
+                    ? "Session Active"
+                    : "Start Session"}
+              </Button>
+            )}
           </div>
         </div>
 
@@ -871,11 +944,7 @@ export default function CoursePage() {
                                         <Button
                                           variant="default"
                                           size="sm"
-                                          onClick={() =>
-                                            router.push(
-                                              `/session/${session._id}`,
-                                            )
-                                          }
+                                          href={`/session/${session._id}`}
                                           className="h-7 w-7 p-0"
                                         >
                                           <Eye className="h-3 w-3" />
@@ -948,9 +1017,7 @@ export default function CoursePage() {
                                       <Button
                                         variant="default"
                                         size="sm"
-                                        onClick={() =>
-                                          router.push(`/session/${session._id}`)
-                                        }
+                                        href={`/session/${session._id}`}
                                         className="h-8 w-8 p-0"
                                       >
                                         <Eye className="h-4 w-4" />
@@ -1069,33 +1136,32 @@ export default function CoursePage() {
                                       <div className="flex gap-1">
                                         <Button
                                           size="sm"
-                                          onClick={() =>
-                                            router.push(
-                                              `/students/${courseId}/${student._id}/attendance`,
-                                            )
-                                          }
+                                          href={`/students/${courseId}/${student._id}/attendance`}
                                           className="h-7 w-7 p-0 transition-all duration-200 hover:scale-105"
                                           title="View attendance history"
                                         >
                                           <Eye className="h-3 w-3" />
                                         </Button>
-                                        <Button
-                                          variant="destructive"
-                                          size="sm"
-                                          onClick={() =>
-                                            handleRemoveStudent(student._id)
-                                          }
-                                          disabled={
-                                            removingStudentId === student._id
-                                          }
-                                          className="h-7 w-7 p-0"
-                                        >
-                                          {removingStudentId === student._id ? (
-                                            <Loader2 className="h-3 w-3 animate-spin" />
-                                          ) : (
-                                            <Trash2 className="h-3 w-3" />
-                                          )}
-                                        </Button>
+                                        {!isAdmin && (
+                                          <Button
+                                            variant="destructive"
+                                            size="sm"
+                                            onClick={() =>
+                                              handleRemoveStudent(student._id)
+                                            }
+                                            disabled={
+                                              removingStudentId === student._id
+                                            }
+                                            className="h-7 w-7 p-0"
+                                          >
+                                            {removingStudentId ===
+                                            student._id ? (
+                                              <Loader2 className="h-3 w-3 animate-spin" />
+                                            ) : (
+                                              <Trash2 className="h-3 w-3" />
+                                            )}
+                                          </Button>
+                                        )}
                                       </div>
                                     </td>
                                   </tr>
@@ -1159,33 +1225,31 @@ export default function CoursePage() {
                                     <div className="flex gap-2">
                                       <Button
                                         size="sm"
-                                        onClick={() =>
-                                          router.push(
-                                            `/students/${courseId}/${student._id}/attendance`,
-                                          )
-                                        }
+                                        href={`/students/${courseId}/${student._id}/attendance`}
                                         className="h-8 w-8 p-0 transition-all duration-200 hover:scale-105"
                                         title="View attendance history"
                                       >
                                         <Eye className="h-4 w-4" />
                                       </Button>
-                                      <Button
-                                        variant="destructive"
-                                        size="sm"
-                                        onClick={() =>
-                                          handleRemoveStudent(student._id)
-                                        }
-                                        disabled={
-                                          removingStudentId === student._id
-                                        }
-                                        className="h-8 w-8 p-0"
-                                      >
-                                        {removingStudentId === student._id ? (
-                                          <Loader2 className="h-4 w-4 animate-spin" />
-                                        ) : (
-                                          <Trash2 className="h-4 w-4" />
-                                        )}
-                                      </Button>
+                                      {!isAdmin && (
+                                        <Button
+                                          variant="destructive"
+                                          size="sm"
+                                          onClick={() =>
+                                            handleRemoveStudent(student._id)
+                                          }
+                                          disabled={
+                                            removingStudentId === student._id
+                                          }
+                                          className="h-8 w-8 p-0"
+                                        >
+                                          {removingStudentId === student._id ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                          ) : (
+                                            <Trash2 className="h-4 w-4" />
+                                          )}
+                                        </Button>
+                                      )}
                                     </div>
                                   </td>
                                 </tr>
@@ -1331,11 +1395,7 @@ export default function CoursePage() {
                                             <Button
                                               variant="outline"
                                               size="sm"
-                                              onClick={() =>
-                                                router.push(
-                                                  `/session/${session._id}/live`,
-                                                )
-                                              }
+                                              href={`/session/${session._id}/live`}
                                               className="h-7 w-7 p-0 transition-all duration-200 hover:scale-105"
                                               title="View live session"
                                             >
@@ -1356,11 +1416,7 @@ export default function CoursePage() {
                                         )}
                                         <Button
                                           size="sm"
-                                          onClick={() =>
-                                            router.push(
-                                              `/session/${session._id}`,
-                                            )
-                                          }
+                                          href={`/session/${session._id}`}
                                           className="h-7 w-7 p-0 transition-all duration-200 hover:scale-105"
                                           title="View session details"
                                         >
@@ -1454,11 +1510,7 @@ export default function CoursePage() {
                                           <Button
                                             variant="outline"
                                             size="sm"
-                                            onClick={() =>
-                                              router.push(
-                                                `/session/${session._id}/live`,
-                                              )
-                                            }
+                                            href={`/session/${session._id}/live`}
                                             className="h-8 w-8 p-0 transition-all duration-200 hover:scale-105"
                                             title="View live session"
                                           >
@@ -1480,9 +1532,7 @@ export default function CoursePage() {
                                       <Button
                                         variant="default"
                                         size="sm"
-                                        onClick={() =>
-                                          router.push(`/session/${session._id}`)
-                                        }
+                                        href={`/session/${session._id}`}
                                         className="h-8 w-8 p-0 transition-all duration-200 hover:scale-105"
                                         title="View session details"
                                       >
@@ -1618,7 +1668,7 @@ export default function CoursePage() {
                   {/* Download & Email Reports Section */}
                   <div>
                     <h3 className="mb-4 text-lg font-semibold">
-                      Get reports via email or directly on here 
+                      Get reports via email or directly on here
                     </h3>
                     <div className="grid gap-4 sm:grid-cols-3 md:grid-cols-4">
                       {/* CSV Report Card */}
@@ -1683,7 +1733,7 @@ export default function CoursePage() {
                         </CardContent>
                       </Card>
 
-                       {/* Email CSV Card */}
+                      {/* Email CSV Card */}
                       <Card className="border-border/50 bg-muted/20 hover:bg-muted/40 transition-all duration-300">
                         <CardContent className="p-4">
                           <div className="flex items-start gap-3">
@@ -1754,9 +1804,7 @@ export default function CoursePage() {
                     <h3 className="mb-4 text-lg font-semibold">
                       Email Reports
                     </h3>
-                    <div className="grid gap-4 sm:grid-cols-3">
-                     
-                    </div>
+                    <div className="grid gap-4 sm:grid-cols-3"></div>
                   </div>
 
                   {/* Report Information */}
@@ -1795,20 +1843,22 @@ export default function CoursePage() {
         </div>
       </div>
 
-      {/* End Session Modal */}
-      <EndSessionModal
-        isOpen={showEndSessionModal}
-        onClose={() => {
-          setShowEndSessionModal(false);
-          setSessionToEnd(null);
-        }}
-        onConfirm={confirmEndSession}
-        session={sessionToEnd}
-        isLoading={isEndingSession}
-      />
+      {/* End Session Modal - Only for teachers */}
+      {!isAdmin && (
+        <EndSessionModal
+          isOpen={showEndSessionModal}
+          onClose={() => {
+            setShowEndSessionModal(false);
+            setSessionToEnd(null);
+          }}
+          onConfirm={confirmEndSession}
+          session={sessionToEnd}
+          isLoading={isEndingSession}
+        />
+      )}
 
-      {/* Update Course Modal */}
-      {currentCourse && (
+      {/* Update Course Modal - Only for teachers */}
+      {!isAdmin && currentCourse && (
         <UpdateCourseModal
           isOpen={showUpdateCourseModal}
           onClose={() => setShowUpdateCourseModal(false)}
@@ -1818,25 +1868,27 @@ export default function CoursePage() {
         />
       )}
 
-      {/* Student Removal Confirmation Modal */}
-      <ConfirmationModal
-        isOpen={showConfirmationModal}
-        onClose={() => {
-          setShowConfirmationModal(false);
-          setStudentToRemove(null);
-        }}
-        onConfirm={confirmRemoveStudent}
-        title="Remove Student"
-        description={
-          studentToRemove
-            ? `Are you sure you want to remove ${studentToRemove.name} from this course? This action cannot be undone.`
-            : "Are you sure you want to remove this student?"
-        }
-        confirmText="Remove Student"
-        cancelText="Cancel"
-        variant="destructive"
-        isLoading={removingStudentId === studentToRemove?.id}
-      />
+      {/* Student Removal Confirmation Modal - Only for teachers */}
+      {!isAdmin && (
+        <ConfirmationModal
+          isOpen={showConfirmationModal}
+          onClose={() => {
+            setShowConfirmationModal(false);
+            setStudentToRemove(null);
+          }}
+          onConfirm={confirmRemoveStudent}
+          title="Remove Student"
+          description={
+            studentToRemove
+              ? `Are you sure you want to remove ${studentToRemove.name} from this course? This action cannot be undone.`
+              : "Are you sure you want to remove this student?"
+          }
+          confirmText="Remove Student"
+          cancelText="Cancel"
+          variant="destructive"
+          isLoading={removingStudentId === studentToRemove?.id}
+        />
+      )}
     </DashboardLayout>
   );
 }

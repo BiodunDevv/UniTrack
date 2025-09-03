@@ -277,7 +277,11 @@ const ProfilePage = () => {
           <Breadcrumb items={[{ label: "Profile Settings", current: true }]} />
         </div>
 
-        <Button variant="outline" className="mr-auto md:hidden" onClick={() => router.back()}>
+        <Button
+          variant="outline"
+          className="mr-auto"
+          onClick={() => router.back()}
+        >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Dashboard
         </Button>

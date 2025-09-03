@@ -427,6 +427,7 @@ interface CourseState {
     course_code: string;
     title: string;
     level: number;
+    lecturer_id?: string; // Optional for admin use
   }) => Promise<void>;
   getAllCourses: () => Promise<void>; // Updated to remove pagination params
   getCourse: (courseId: string) => Promise<void>;

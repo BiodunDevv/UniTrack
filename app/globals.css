@@ -332,6 +332,52 @@
   }
 }
 
+/* Reusable Animation Classes */
+.animate-fade-in-up {
+  animation-name: fadeInUp;
+  animation-duration: 0.4s;
+  animation-timing-function: ease-out;
+  animation-fill-mode: forwards;
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.animate-stagger {
+  animation-delay: calc(var(--stagger-delay, 0) * 50ms);
+}
+
+/* Utility classes for common stagger delays */
+.animate-stagger-1 {
+  --stagger-delay: 1;
+}
+.animate-stagger-2 {
+  --stagger-delay: 2;
+}
+.animate-stagger-3 {
+  --stagger-delay: 3;
+}
+.animate-stagger-4 {
+  --stagger-delay: 4;
+}
+.animate-stagger-5 {
+  --stagger-delay: 5;
+}
+.animate-stagger-6 {
+  --stagger-delay: 6;
+}
+.animate-stagger-7 {
+  --stagger-delay: 7;
+}
+.animate-stagger-8 {
+  --stagger-delay: 8;
+}
+.animate-stagger-9 {
+  --stagger-delay: 9;
+}
+.animate-stagger-10 {
+  --stagger-delay: 10;
+}
+
 html {
   scroll-behavior: smooth;
   scrollbar-width: none;

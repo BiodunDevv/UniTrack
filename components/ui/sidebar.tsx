@@ -257,7 +257,10 @@ function SidebarTrigger({
   className,
   onClick,
   ...props
-}: React.ComponentProps<typeof Button>) {
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link" | "glow";
+  size?: "default" | "sm" | "lg" | "icon" | "xs";
+}) {
   const { toggleSidebar } = useSidebar();
 
   return (

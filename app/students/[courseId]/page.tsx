@@ -14,7 +14,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import * as React from "react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -39,12 +39,16 @@ import { CopyStudentsModal } from "@/components/ui/copy-students-modal";
 import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuthStore } from "@/store/auth-store";
 import { useCourseStore } from "@/store/course-store";
 
 export default function StudentsPage() {
   const params = useParams();
-  const router = useRouter();
   const courseId = params.courseId as string;
+
+  // Auth store
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === "admin";
 
   const {
     currentCourse,
@@ -342,9 +346,7 @@ export default function StudentsPage() {
         <div className="flex flex-1 items-center justify-center">
           <div className="text-center">
             <p className="text-muted-foreground mb-4">Course not found</p>
-            <Button onClick={() => router.push("/course")}>
-              Go to Courses
-            </Button>
+            <Button href="/course">Go to Courses</Button>
           </div>
         </div>
       </DashboardLayout>
@@ -357,11 +359,26 @@ export default function StudentsPage() {
         {/* Breadcrumb */}
         <div className="animate-appear opacity-0">
           <Breadcrumb
-            items={[
-              { label: "Courses", href: "/course" },
-              { label: currentCourse.title, href: `/course/${courseId}` },
-              { label: "Manage Students", current: true },
-            ]}
+            items={
+              isAdmin
+                ? [
+                    { label: "Lecturers", href: "/lecturers" },
+                    {
+                      label: currentCourse.teacher_id?.name || "Lecturer",
+                      href: `/lecturers/${currentCourse.teacher_id?._id}`,
+                    },
+                    {
+                      label: currentCourse.course_code,
+                      href: `/course/${courseId}`,
+                    },
+                    { label: "Manage Students", current: true },
+                  ]
+                : [
+                    { label: "Courses", href: "/course" },
+                    { label: currentCourse.title, href: `/course/${courseId}` },
+                    { label: "Manage Students", current: true },
+                  ]
+            }
           />
         </div>
 
@@ -372,7 +389,7 @@ export default function StudentsPage() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => router.push(`/course/${courseId}`)}
+                href={`/course/${courseId}`}
                 className="hover:bg-accent hover:text-accent-foreground transition-all duration-300 hover:scale-105 md:hidden"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
@@ -671,11 +688,7 @@ export default function StudentsPage() {
                                       <div className="flex gap-1">
                                         <Button
                                           size="sm"
-                                          onClick={() =>
-                                            router.push(
-                                              `/students/${courseId}/${student._id}/attendance`,
-                                            )
-                                          }
+                                          href={`/students/${courseId}/${student._id}/attendance`}
                                           className="h-7 w-7 p-0 transition-all duration-200 hover:scale-105"
                                           title="View attendance history"
                                         >
@@ -820,11 +833,7 @@ export default function StudentsPage() {
                                     <div className="flex gap-2">
                                       <Button
                                         size="sm"
-                                        onClick={() =>
-                                          router.push(
-                                            `/students/${courseId}/${student._id}/attendance`,
-                                          )
-                                        }
+                                        href={`/students/${courseId}/${student._id}/attendance`}
                                         className="h-8 w-8 p-0 transition-all duration-200 hover:scale-105"
                                         title="View attendance history"
                                       >

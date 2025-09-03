@@ -36,11 +36,21 @@ const buttonVariants = cva(
   },
 );
 
-export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {
+type ButtonBaseProps = VariantProps<typeof buttonVariants> & {
   asChild?: boolean;
-}
+};
+
+type ButtonAsButton = ButtonBaseProps &
+  React.ButtonHTMLAttributes<HTMLButtonElement> & {
+    href?: never;
+  };
+
+type ButtonAsAnchor = ButtonBaseProps &
+  React.AnchorHTMLAttributes<HTMLAnchorElement> & {
+    href: string;
+  };
+
+export type ButtonProps = ButtonAsButton | ButtonAsAnchor;
 
 function Button({
   className,
@@ -49,12 +59,36 @@ function Button({
   asChild = false,
   ...props
 }: ButtonProps) {
-  const Comp = asChild ? Slot : "button";
+  // If href is provided, render as anchor; if asChild is true, use Slot; otherwise use button
+  const isAnchor = "href" in props;
+
+  if (isAnchor) {
+    const { href, ...anchorProps } = props as ButtonAsAnchor;
+    return (
+      <a
+        data-slot="button"
+        className={cn(buttonVariants({ variant, size, className }))}
+        href={href}
+        {...anchorProps}
+      />
+    );
+  }
+
+  if (asChild) {
+    return (
+      <Slot
+        data-slot="button"
+        className={cn(buttonVariants({ variant, size, className }))}
+        {...(props as ButtonAsButton)}
+      />
+    );
+  }
+
   return (
-    <Comp
+    <button
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
-      {...props}
+      {...(props as ButtonAsButton)}
     />
   );
 }

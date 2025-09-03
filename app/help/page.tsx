@@ -373,9 +373,7 @@ export default function HelpPage() {
                           ))}
                         </div>
                         <div className="mt-4 flex items-center justify-between border-t pt-4">
-                          <span className="text-muted-foreground text-sm">
-                            By {faq.created_by.name}
-                          </span>
+                         
                           <span className="text-muted-foreground text-sm">
                             {new Date(faq.last_updated).toLocaleDateString()}
                           </span>

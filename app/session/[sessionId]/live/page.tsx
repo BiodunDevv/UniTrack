@@ -31,6 +31,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useAuthStore } from "@/store/auth-store";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api";
@@ -96,6 +97,10 @@ export default function LiveSessionPage() {
   const params = useParams();
   const router = useRouter();
   const sessionId = params.sessionId as string;
+
+  // Auth store
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === "admin";
 
   const [liveData, setLiveData] = React.useState<LiveSessionResponse | null>(
     null,
@@ -170,7 +175,6 @@ export default function LiveSessionPage() {
   const formatDateTime = (dateString: string) => {
     return new Date(dateString).toLocaleString();
   };
-
 
   const formatTimeRemaining = (expiresAt: string) => {
     const now = new Date();
@@ -249,25 +253,41 @@ export default function LiveSessionPage() {
         {/* Breadcrumb */}
         <div className="animate-appear opacity-0">
           <Breadcrumb
-            items={[
-              { label: "Courses", href: "/course" },
-              {
-                label: "Course",
-                href: `/course`,
-              },
-              {
-                label: `Session ${session_info.session_code}`,
-                href: `/session/${sessionId}`,
-              },
-              { label: "Live Monitoring", current: true },
-            ]}
+            items={
+              isAdmin
+                ? [
+                    { label: "Lecturers", href: "/lecturers" },
+                    {
+                      label: `Session ${session_info.session_code}`,
+                      href: `/session/${sessionId}`,
+                    },
+                    { label: "Live Monitoring", current: true },
+                  ]
+                : [
+                    { label: "Courses", href: "/course" },
+                    {
+                      label: "Course",
+                      href: `/course`,
+                    },
+                    {
+                      label: `Session ${session_info.session_code}`,
+                      href: `/session/${sessionId}`,
+                    },
+                    { label: "Live Monitoring", current: true },
+                  ]
+            }
           />
         </div>
 
         {/* Header */}
         <div className="animate-appear flex flex-col gap-4 opacity-0 delay-100 lg:justify-between">
           <div className="space-y-2">
-            <Button variant="outline" size="sm" onClick={() => router.back()}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.back()}
+              className="md:hidden"
+            >
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Session
             </Button>

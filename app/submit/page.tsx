@@ -27,6 +27,7 @@ import {
 import Glow from "@/components/ui/glow";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { isMobileOrTablet } from "@/lib/device-utils";
 
 interface LocationData {
   lat: number;
@@ -85,6 +86,13 @@ export default function SubmitAttendancePage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [submissionResult, setSubmissionResult] =
     useState<SubmissionResult | null>(null);
+
+  // Device restriction check
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  React.useEffect(() => {
+    setIsDesktop(!isMobileOrTablet());
+  }, []);
 
   // Generate device fingerprint using FingerprintJS
   const generateFingerprint = useCallback(async () => {
@@ -331,28 +339,33 @@ export default function SubmitAttendancePage() {
 
   return (
     <div className="bg-background min-h-screen">
-      {/* Hero Section */}
-      <div className="relative overflow-hidden pt-8 sm:pt-12">
-        <div className="relative container mx-auto px-4 py-8 sm:py-16">
-          <div className="mx-auto max-w-4xl text-center">
-            {/* Back Button */}
-            <div className="mb-6 flex justify-start">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.history.back()}
-                className="hover:bg-accent hover:text-accent-foreground transition-all duration-300"
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Dashboard
-              </Button>
-            </div>
+      {/* Main Content - Show on all devices but restrict submission */}
+      {/* Back Button */}
+      <div className="container mx-auto px-4 pt-8">
+        <div className="mb-6 flex justify-start">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.history.back()}
+            className="hover:bg-accent hover:text-accent-foreground transition-all duration-300"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Dashboard
+          </Button>
+        </div>
+      </div>
 
+      {/* Hero Section */}
+      <div className="relative overflow-hidden pt-4 sm:pt-8">
+        <div className="relative container mx-auto px-4 py-4 sm:py-8">
+          <div className="mx-auto max-w-4xl text-center">
             {/* Header */}
             <div className="mb-8 space-y-4 sm:mb-12 sm:space-y-6">
               <div className="bg-primary/10 text-primary inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium">
                 <Smartphone className="h-4 w-4" />
-                Mobile Attendance System
+                {isDesktop
+                  ? "Attendance System (Preview)"
+                  : "Mobile Attendance System"}
               </div>
 
               <h1 className="from-foreground to-muted-foreground bg-gradient-to-r bg-clip-text text-xl font-bold text-transparent sm:text-2xl lg:text-4xl">
@@ -362,6 +375,11 @@ export default function SubmitAttendancePage() {
               <p className="text-muted-foreground sm:text-md mx-auto max-w-2xl text-sm">
                 Secure, location-verified attendance submission with real-time
                 processing and instant confirmation
+                {isDesktop && (
+                  <span className="mt-1 block font-medium text-orange-600">
+                    Preview only - Use mobile device to submit attendance
+                  </span>
+                )}
               </p>
 
               {/* Feature highlights */}
@@ -379,8 +397,7 @@ export default function SubmitAttendancePage() {
                   Instant Confirmation
                 </div>
               </div>
-            </div>
-
+            </div>{" "}
             {/* Main Form Card */}
             <div className="relative mx-auto max-w-2xl">
               <Card className="border-border/50 bg-card/80 relative backdrop-blur-xl">
@@ -555,7 +572,9 @@ export default function SubmitAttendancePage() {
                                   ? "Getting location..."
                                   : locationError
                                     ? "Location error"
-                                    : "Click 'Get Location' below to enable GPS"}
+                                    : isDesktop
+                                      ? "Click 'Get Location' below to test GPS (preview mode)"
+                                      : "Click 'Get Location' below to enable GPS"}
                               </p>
                             )}
                           </div>
@@ -581,7 +600,9 @@ export default function SubmitAttendancePage() {
                         ) : (
                           <>
                             <MapPin className="mr-2 h-4 w-4" />
-                            Get Location
+                            {isDesktop
+                              ? "Test Location (Preview)"
+                              : "Get Location"}
                           </>
                         )}
                       </Button>
@@ -600,7 +621,9 @@ export default function SubmitAttendancePage() {
                         ) : (
                           <>
                             <RefreshCw className="mr-2 h-4 w-4" />
-                            Refresh Location
+                            {isDesktop
+                              ? "Refresh Location (Preview)"
+                              : "Refresh Location"}
                           </>
                         )}
                       </Button>
@@ -652,33 +675,63 @@ export default function SubmitAttendancePage() {
                     </div>
                   </div>
 
-                  {/* Submit Button */}
-                  <Button
-                    onClick={submitAttendance}
-                    disabled={
-                      isSubmitting ||
-                      !formData.matric_no ||
-                      !formData.session_code ||
-                      !formData.level ||
-                      !location
-                    }
-                    className="group relative h-12 w-full overflow-hidden text-base font-medium"
-                  >
-                    {/* Button Glow */}
-                    <div className="bg-primary/20 absolute inset-0 translate-y-full transition-transform group-hover:translate-y-0" />
+                  {/* Submit Button or Desktop Restriction */}
+                  {isDesktop ? (
+                    <>
+                      {/* Desktop Restriction Message */}
+                      <div className="border-destructive/50 bg-destructive/5 rounded-lg border p-4">
+                        <div className="mb-2 flex items-center gap-2">
+                          <Smartphone className="text-destructive h-5 w-5" />
+                          <span className="text-destructive font-medium">
+                            Mobile Device Required
+                          </span>
+                        </div>
+                        <p className="text-destructive/80 mb-3 text-sm">
+                          For security and location accuracy, attendance
+                          submission can only be done from mobile devices or
+                          tablets.
+                        </p>
+                        <div className="space-y-2">
+                          <p className="text-muted-foreground text-xs">
+                            You can preview the form and interface, but to
+                            submit attendance please access from:
+                          </p>
+                          <ul className="text-muted-foreground ml-4 space-y-1 text-xs">
+                            <li>• Mobile phone (iOS or Android)</li>
+                            <li>• Tablet device</li>
+                            <li>• Device with GPS capabilities</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <Button
+                      onClick={submitAttendance}
+                      disabled={
+                        isSubmitting ||
+                        !formData.matric_no ||
+                        !formData.session_code ||
+                        !formData.level ||
+                        !location
+                      }
+                      className="group relative h-12 w-full overflow-hidden text-base font-medium"
+                    >
+                      {/* Button Glow */}
+                      <div className="bg-primary/20 absolute inset-0 translate-y-full transition-transform group-hover:translate-y-0" />
 
-                    {isSubmitting ? (
-                      <>
-                        <Wifi className="mr-2 h-4 w-4 animate-spin" />
-                        Submitting Attendance...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="mr-2 h-4 w-4" />
-                        Submit Attendance
-                      </>
-                    )}
-                  </Button>
+                      {isSubmitting ? (
+                        <>
+                          <Wifi className="mr-2 h-4 w-4 animate-spin" />
+                          Submitting Attendance...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="mr-2 h-4 w-4" />
+                          Submit Attendance
+                        </>
+                      )}
+                    </Button>
+                  )}
 
                   {/* Help Section */}
                   <Card className="border-border/30 bg-muted/20">

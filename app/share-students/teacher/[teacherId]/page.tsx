@@ -24,12 +24,17 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useAuthStore } from "@/store/auth-store";
 import { useStudentShareStore } from "@/store/student-share-store";
 
 export default function TeacherDetailPage() {
   const router = useRouter();
   const params = useParams();
   const teacherId = params.teacherId as string;
+
+  // Auth store
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === "admin";
 
   const {
     teachers,
@@ -136,10 +141,18 @@ export default function TeacherDetailPage() {
         {/* Breadcrumb */}
         <div className="animate-appear opacity-0">
           <Breadcrumb
-            items={[
-              { label: "Share Students", href: "/share-students" },
-              { label: teacher.name, current: true },
-            ]}
+            items={
+              isAdmin
+                ? [
+                    { label: "Lecturers", href: "/lecturers" },
+                    { label: teacher.name, href: `/lecturers/${teacherId}` },
+                    { label: "Share Students", current: true },
+                  ]
+                : [
+                    { label: "Share Students", href: "/share-students" },
+                    { label: teacher.name, current: true },
+                  ]
+            }
           />
         </div>
 
@@ -316,13 +329,12 @@ export default function TeacherDetailPage() {
               {filteredCourses.map((course, index) => (
                 <Card
                   key={course._id}
-                  className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 cursor-pointer backdrop-blur-sm transition-all duration-300 hover:shadow-lg"
-                  style={{
-                    animationDelay: `${index * 50}ms`,
-                    animation: "fadeInUp 0.4s ease-out forwards",
-                    opacity: 0,
-                    transform: "translateY(10px)",
-                  }}
+                  className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 animate-fade-in-up animate-stagger cursor-pointer backdrop-blur-sm transition-all duration-300 hover:shadow-lg"
+                  style={
+                    {
+                      "--stagger-delay": index,
+                    } as React.CSSProperties
+                  }
                   onClick={() => handleCourseClick(course._id)}
                 >
                   <CardHeader className="pb-3">

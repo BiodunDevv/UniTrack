@@ -127,8 +127,8 @@ export default function Features({ className }: FeaturesProps) {
           {features.map((feature, index) => (
             <div
               key={index}
-              className="animate-fade-in"
-              style={{ animationDelay: `${index * 100}ms` }}
+              className="animate-fade-in-up animate-stagger"
+              style={{ "--stagger-delay": index * 2 } as React.CSSProperties} // 2x for 100ms instead of 50ms
             >
               <FeatureCard
                 title={feature.title}

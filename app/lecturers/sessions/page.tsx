@@ -3,7 +3,6 @@
 import {
   Activity,
   ArrowLeft,
-  BookOpen,
   Calendar,
   Clock,
   Eye,
@@ -13,9 +12,9 @@ import {
   Timer,
   Users,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import * as React from "react";
-import { useState } from "react";
+import { useEffect,useState } from "react";
 import { toast } from "sonner";
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
@@ -29,7 +28,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { CourseSelectionModal } from "@/components/ui/course-selection-modal";
 import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
 import {
@@ -39,27 +37,37 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {useAdminStore } from "@/store/admin-store";
 import { useAuthStore } from "@/store/auth-store";
-import { useSessionStore } from "@/store/session-store";
 
-export default function SessionsPage() {
-  const router = useRouter();
+export default function CourseSessionsPage() {
+  const params = useParams();
+  const lecturerId = params.lecturerId as string;
+
   const {
-    sessions,
-    isLoading,
-    error,
-    pagination,
-    summary,
-    getAllSessions,
-    clearError,
-  } = useSessionStore();
+    courseInfo,
+    courseSessions,
+    sessionsPagination,
+    isLoadingSessions,
+    sessionsError,
+    getCourseSessions,
+    clearSessionsError,
+  } = useAdminStore();
 
-  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const [showCourseSelectionModal, setShowCourseSelectionModal] =
-    useState(false);
+
+  // Get course ID from URL query params
+  const [courseId, setCourseId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      setCourseId(urlParams.get("courseId"));
+    }
+  }, [lecturerId]);
 
   // Format date with day of week
   const formatDateWithDay = (dateString: string) => {
@@ -72,25 +80,33 @@ export default function SessionsPage() {
   };
 
   // Fetch sessions on component mount
-  React.useEffect(() => {
-    if (isAuthenticated && !authLoading) {
-      getAllSessions(
+  useEffect(() => {
+    if (isAuthenticated && !authLoading && courseId) {
+      getCourseSessions(
+        courseId,
         currentPage,
-        10,
+        12,
         statusFilter === "all" ? undefined : statusFilter,
       );
     }
-  }, [getAllSessions, isAuthenticated, authLoading, currentPage, statusFilter]);
+  }, [
+    getCourseSessions,
+    isAuthenticated,
+    authLoading,
+    currentPage,
+    statusFilter,
+    courseId,
+  ]);
 
-  React.useEffect(() => {
-    if (error) {
-      toast.error(error);
-      clearError();
+  useEffect(() => {
+    if (sessionsError) {
+      toast.error(sessionsError);
+      clearSessionsError();
     }
-  }, [error, clearError]);
+  }, [sessionsError, clearSessionsError]);
 
   // Reset to first page when search query or filter changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (searchQuery || statusFilter !== "all") {
       setCurrentPage(1);
     }
@@ -98,7 +114,7 @@ export default function SessionsPage() {
 
   // Filter sessions based on search query (client-side filtering for search)
   const filteredSessions = searchQuery
-    ? sessions.filter(
+    ? courseSessions.filter(
         (session) =>
           session.course_id.title
             .toLowerCase()
@@ -110,25 +126,11 @@ export default function SessionsPage() {
             .toLowerCase()
             .includes(searchQuery.toLowerCase()),
       )
-    : sessions;
-
-  const handleSessionClick = (session: (typeof sessions)[0]) => {
-    router.push(`/session/${session._id}`);
-  };
+    : courseSessions;
 
   const handleFilterChange = (value: string) => {
     setStatusFilter(value);
     setCurrentPage(1);
-  };
-
-  // Handle session started callback
-
-  // Get time-based greeting
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
   };
 
   // Format level for display
@@ -145,16 +147,29 @@ export default function SessionsPage() {
   };
 
   // Format duration
-  const formatDuration = (minutes: number) => {
+  const formatDuration = (startTime: string, endTime: string) => {
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    const diffMs = end.getTime() - start.getTime();
+    const minutes = Math.floor(diffMs / (1000 * 60));
+
     if (minutes < 60) return `${minutes}m`;
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
   };
 
-  // Format time remaining
-  const formatTimeRemaining = (minutes: number) => {
-    if (minutes <= 0) return "Expired";
+  // Format time remaining for active sessions
+  const formatTimeRemaining = (expiryTime: string, isActive: boolean) => {
+    if (!isActive) return "Expired";
+
+    const now = new Date();
+    const expiry = new Date(expiryTime);
+    const diffMs = expiry.getTime() - now.getTime();
+
+    if (diffMs <= 0) return "Expired";
+
+    const minutes = Math.floor(diffMs / (1000 * 60));
     if (minutes < 60) return `${minutes}m left`;
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
@@ -162,18 +177,66 @@ export default function SessionsPage() {
   };
 
   // Get status color
-  const getStatusColor = (isActive: boolean, timeRemaining: number) => {
-    if (!isActive || timeRemaining <= 0)
+  const getStatusColor = (isActive: boolean, expiryTime: string) => {
+    if (!isActive || new Date(expiryTime) <= new Date())
       return "bg-gray-100 text-gray-800 border-gray-200";
     return "bg-green-100 text-green-800 border-green-200";
   };
+
+  // Calculate summary stats
+  const summary = React.useMemo(() => {
+    const totalSessions = sessionsPagination?.totalSessions || 0;
+    const activeSessions = courseSessions.filter(
+      (session) =>
+        session.is_active && new Date(session.expiry_ts) > new Date(),
+    ).length;
+    const expiredSessions = totalSessions - activeSessions;
+
+    return {
+      total_sessions: totalSessions,
+      active_sessions: activeSessions,
+      expired_sessions: expiredSessions,
+    };
+  }, [courseSessions, sessionsPagination]);
+
+  if (!courseId) {
+    return (
+      <DashboardLayout>
+        <div className="flex h-96 items-center justify-center">
+          <div className="text-center">
+            <h3 className="mb-2 text-lg font-semibold">No Course Selected</h3>
+            <p className="text-muted-foreground mb-4">
+              Please select a course to view its sessions.
+            </p>
+            <Button href="/dashboard">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Go Back
+            </Button>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
       <div className="space-y-6 p-4 lg:p-6">
         {/* Breadcrumb */}
         <div className="animate-appear opacity-0">
-          <Breadcrumb items={[{ label: "Sessions", current: true }]} />
+          <Breadcrumb
+            items={[
+              { label: "Lecturers", href: "/lecturers" },
+              {
+                label: courseInfo?.teacher_id.name || "Lecturer",
+                href: `/lecturers/${courseInfo?.teacher_id._id}`,
+              },
+              {
+                label: courseInfo?.course_code || "Course",
+                href: `/course/${courseId}`,
+              },
+              { label: `${courseInfo?.course_code} Sessions`, current: true },
+            ]}
+          />
         </div>
 
         {/* Header Section */}
@@ -183,37 +246,34 @@ export default function SessionsPage() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => router.push(`/`)}
                 className="hover:bg-accent hover:text-accent-foreground transition-all duration-300 md:hidden"
+                href={`/course/${courseId}`}
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Home
+                Back to Course
               </Button>
             </div>
             <h1 className="from-foreground to-muted-foreground bg-gradient-to-r bg-clip-text text-3xl font-bold text-transparent lg:text-4xl">
-              Session Management
+              Course Sessions
             </h1>
-            <p className="text-muted-foreground text-sm lg:text-base">
-              {getGreeting()}, {user?.name || "Lecturer"} • Monitor and manage
-              your attendance sessions
-              {!isLoading &&
-                pagination &&
-                pagination.total_pages > 1 &&
-                !searchQuery && (
-                  <span className="ml-2">
-                    • Page {pagination.current_page} of {pagination.total_pages}
-                  </span>
-                )}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => setShowCourseSelectionModal(true)}
-              className="bg-green-600 transition-all duration-300 hover:scale-105 hover:bg-green-700 hover:shadow-lg hover:shadow-green-600/20"
-            >
-              <Clock className="mr-2 h-4 w-4" />
-              Start Session
-            </Button>
+            {courseInfo && (
+              <div className="space-y-1">
+                <p className="text-xl font-semibold">{courseInfo.title}</p>
+                <p className="text-muted-foreground text-sm lg:text-base">
+                  {courseInfo.course_code} • {formatLevel(courseInfo.level)} •{" "}
+                  {courseInfo.teacher_id.name}
+                  {!isLoadingSessions &&
+                    sessionsPagination &&
+                    sessionsPagination.totalPages > 1 &&
+                    !searchQuery && (
+                      <span className="ml-2">
+                        • Page {sessionsPagination.currentPage} of{" "}
+                        {sessionsPagination.totalPages}
+                      </span>
+                    )}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -230,7 +290,7 @@ export default function SessionsPage() {
           </div>
           <div className="flex items-center gap-4">
             <Select value={statusFilter} onValueChange={handleFilterChange}>
-              <SelectTrigger className="border-border/50 bg-card/50 w-[140px] backdrop-blur-sm">
+              <SelectTrigger>
                 <Filter className="mr-2 h-4 w-4" />
                 <SelectValue placeholder="Filter" />
               </SelectTrigger>
@@ -241,7 +301,7 @@ export default function SessionsPage() {
               </SelectContent>
             </Select>
             {/* Search results counter */}
-            {searchQuery && !isLoading && (
+            {searchQuery && !isLoadingSessions && (
               <div className="text-muted-foreground text-sm">
                 {filteredSessions.length} result
                 {filteredSessions.length !== 1 ? "s" : ""} found
@@ -263,14 +323,14 @@ export default function SessionsPage() {
             </CardHeader>
             <CardContent>
               <div className="group-hover:text-primary/90 text-2xl font-bold transition-colors duration-300">
-                {isLoading ? (
+                {isLoadingSessions ? (
                   <div className="border-primary h-8 w-8 animate-spin rounded-full border-b-2"></div>
                 ) : (
-                  summary?.total_sessions || 0
+                  summary.total_sessions
                 )}
               </div>
               <p className="text-muted-foreground group-hover:text-foreground/80 text-xs transition-colors duration-300">
-                {isLoading ? "" : "All-time sessions"}
+                {isLoadingSessions ? "" : "All-time sessions"}
               </p>
             </CardContent>
           </Card>
@@ -286,14 +346,14 @@ export default function SessionsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold transition-colors duration-300 group-hover:text-green-600">
-                {isLoading ? (
+                {isLoadingSessions ? (
                   <div className="border-primary h-8 w-8 animate-spin rounded-full border-b-2"></div>
                 ) : (
-                  summary?.active_sessions || 0
+                  summary.active_sessions
                 )}
               </div>
               <p className="text-muted-foreground group-hover:text-foreground/80 text-xs transition-colors duration-300">
-                {isLoading ? "" : "Currently running"}
+                {isLoadingSessions ? "" : "Currently running"}
               </p>
             </CardContent>
           </Card>
@@ -309,14 +369,14 @@ export default function SessionsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold transition-colors duration-300 group-hover:text-gray-600">
-                {isLoading ? (
+                {isLoadingSessions ? (
                   <div className="border-primary h-8 w-8 animate-spin rounded-full border-b-2"></div>
                 ) : (
-                  summary?.expired_sessions || 0
+                  summary.expired_sessions
                 )}
               </div>
               <p className="text-muted-foreground group-hover:text-foreground/80 text-xs transition-colors duration-300">
-                {isLoading ? "" : "Completed sessions"}
+                {isLoadingSessions ? "" : "Completed sessions"}
               </p>
             </CardContent>
           </Card>
@@ -324,7 +384,7 @@ export default function SessionsPage() {
 
         {/* Sessions Grid */}
         <div className="animate-appear space-y-8 opacity-0 delay-500">
-          {isLoading ? (
+          {isLoadingSessions ? (
             <div className="flex flex-1 items-center justify-center">
               <div className="text-center">
                 <div className="border-primary mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-b-2"></div>
@@ -343,17 +403,8 @@ export default function SessionsPage() {
                 <p className="text-muted-foreground mb-4 max-w-md text-center text-sm lg:text-base">
                   {searchQuery
                     ? "Try adjusting your search terms to find what you're looking for"
-                    : "Start an attendance session from your course dashboard"}
+                    : "This course hasn't had any attendance sessions yet"}
                 </p>
-                {!searchQuery && (
-                  <Button
-                    onClick={() => router.push("/course")}
-                    className="hover:shadow-primary/20 transition-all duration-300 hover:scale-105 hover:shadow-lg"
-                  >
-                    <BookOpen className="mr-2 h-4 w-4" />
-                    Go to Courses
-                  </Button>
-                )}
               </CardContent>
             </Card>
           ) : (
@@ -361,13 +412,12 @@ export default function SessionsPage() {
               {filteredSessions.map((session, index) => (
                 <Card
                   key={session._id}
-                  className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 animate-fade-in-up animate-stagger cursor-pointer backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:scale-[1.02] hover:shadow-lg"
+                  className="group border-border/50 bg-card/50 hover:border-border hover:bg-card/80 hover:shadow-primary/5 animate-fade-in-up animate-stagger cursor-pointer backdrop-blur-sm transition-all duration-300"
                   style={
                     {
                       "--stagger-delay": index,
                     } as React.CSSProperties
                   }
-                  onClick={() => handleSessionClick(session)}
                 >
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
@@ -386,11 +436,11 @@ export default function SessionsPage() {
                             variant="default"
                             className={`text-xs ${getStatusColor(
                               session.is_active,
-                              session.stats.time_remaining,
+                              session.expiry_ts,
                             )}`}
                           >
                             {session.is_active &&
-                            session.stats.time_remaining > 0 ? (
+                            new Date(session.expiry_ts) > new Date() ? (
                               <>
                                 <Activity className="mr-1 h-3 w-3" />
                                 Active
@@ -407,8 +457,8 @@ export default function SessionsPage() {
                           {session.course_id.title}
                         </CardTitle>
                         <CardDescription className="text-xs lg:text-sm">
-                          {session.course_id.course_code} •{" "}
-                          {formatLevel(session.course_id.level)}
+                          {session.course_id.course_code} • Session{" "}
+                          {session.session_code}
                         </CardDescription>
                       </div>
                     </div>
@@ -419,11 +469,12 @@ export default function SessionsPage() {
                         <div className="flex items-center justify-between">
                           <span className="text-muted-foreground flex items-center gap-1 text-xs">
                             <Users className="h-3 w-3" />
-                            Attendance
+                            Present
                           </span>
                           <span className="text-xs font-medium">
-                            {session.stats.total_attendance} (
-                            {session.stats.unique_students} unique)
+                            {session.attendance_stats.present_count}/
+                            {session.attendance_stats.total_enrolled} (
+                            {session.attendance_stats.attendance_rate}%)
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
@@ -432,7 +483,10 @@ export default function SessionsPage() {
                             Duration
                           </span>
                           <span className="text-xs font-medium">
-                            {formatDuration(session.stats.duration_minutes)}
+                            {formatDuration(
+                              session.start_ts,
+                              session.expiry_ts,
+                            )}
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
@@ -441,7 +495,10 @@ export default function SessionsPage() {
                             Status
                           </span>
                           <span className="text-xs font-medium">
-                            {formatTimeRemaining(session.stats.time_remaining)}
+                            {formatTimeRemaining(
+                              session.expiry_ts,
+                              session.is_active,
+                            )}
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
@@ -469,10 +526,7 @@ export default function SessionsPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSessionClick(session);
-                          }}
+                          href={`/session/${session._id}`}
                           className="border-border/50 bg-background/50 hover:bg-primary hover:text-primary-foreground flex-1 backdrop-blur-sm transition-all duration-300"
                         >
                           <Eye className="mr-1 h-3 w-3" />
@@ -488,26 +542,20 @@ export default function SessionsPage() {
 
           {/* Pagination Controls */}
           {!searchQuery &&
-            pagination &&
-            pagination.total_pages > 1 &&
-            !isLoading && (
+            sessionsPagination &&
+            sessionsPagination.totalPages > 1 &&
+            !isLoadingSessions && (
               <Pagination
                 currentPage={currentPage}
-                totalPages={pagination.total_pages}
+                totalPages={sessionsPagination.totalPages}
                 onPageChange={setCurrentPage}
-                totalItems={pagination.total_items || 0}
-                itemsPerPage={pagination.items_per_page || 10}
+                totalItems={sessionsPagination.totalSessions || 0}
+                itemsPerPage={12}
                 itemName="sessions"
               />
             )}
         </div>
       </div>
-
-      {/* Course Selection Modal */}
-      <CourseSelectionModal
-        isOpen={showCourseSelectionModal}
-        onClose={() => setShowCourseSelectionModal(false)}
-      />
     </DashboardLayout>
   );
 }
